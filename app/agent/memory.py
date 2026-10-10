@@ -14,6 +14,60 @@ MAX_PREFERENCES_BYTES = 1000
 MAX_TEXT_FIELD_LEN = 100
 VALID_ONBOARDING_STATUSES = {"not_started", "in_progress", "completed"}
 
+FORBIDDEN_ROLES = {
+    "admin", "administrator", "root", "superuser", "system", "sysadmin", "owner", "auth"
+}
+ROLE_ALLOWED_CHARS_REGEX = re.compile(r"^[a-zA-Z\s\-]+$")
+MAX_ROLE_LEN = 40
+MIN_ROLE_LEN = 2
+
+SELF_ASSIGN_ROLE_DEPT_PATTERN = re.compile(
+    r"\b(?:my\s+role\s+is|i\s+am\s+(?:an?\s+)?|i\s+work\s+(?:in|as)\b|my\s+department\s+is|set\s+my\s+role\s+to|set\s+my\s+department\s+to)\b",
+    re.IGNORECASE,
+)
+
+
+def has_explicit_profile_statement(text: str) -> bool:
+    """Checks whether user text explicitly states their own role or department."""
+    if not text:
+        return False
+    return bool(SELF_ASSIGN_ROLE_DEPT_PATTERN.search(text))
+
+
+def validate_role(role: Optional[str]) -> Optional[str]:
+    """Validate role against length cap, allowlisted character pattern, and forbidden privileged names."""
+    if role is None:
+        return None
+    r = role.strip()
+    if not r:
+        return None
+    if len(r) < MIN_ROLE_LEN or len(r) > MAX_ROLE_LEN:
+        raise MemoryError(f"Role must be between {MIN_ROLE_LEN} and {MAX_ROLE_LEN} characters.")
+    if not ROLE_ALLOWED_CHARS_REGEX.match(r):
+        raise MemoryError("Role contains disallowed characters. Only letters, spaces, and hyphens are allowed.")
+    if r.lower() in FORBIDDEN_ROLES:
+        raise MemoryError(f"Privileged role '{r}' is prohibited.")
+    return r
+
+
+def validate_department(dept: Optional[str]) -> Optional[str]:
+    """Validate department against known departments loaded in SQLite."""
+    if dept is None:
+        return None
+    d = dept.strip()
+    if not d:
+        return None
+    from app.database import get_department_employees
+    try:
+        known = {row["name"].strip().lower() for row in get_department_employees()}
+    except Exception:
+        known = set()
+    if not known:
+        known = {"ai", "backend"}
+    if d.lower() not in known:
+        raise MemoryError(f"Unknown department '{d}'. Must be one of: {sorted(known)}.")
+    return d
+
 
 class MemoryError(ValueError):
     """Raised when memory operations violate constraints or validation."""
@@ -126,6 +180,9 @@ class MemoryStore:
         clean_role = sanitize_text_field("role", role)
         clean_dept = sanitize_text_field("department", department)
 
+        valid_role = validate_role(clean_role)
+        valid_dept = validate_department(clean_dept)
+
         connection = self.get_connection()
         try:
             with connection:
@@ -134,8 +191,8 @@ class MemoryStore:
                 existing = cursor.fetchone()
 
                 if existing:
-                    new_role = clean_role if clean_role is not None else existing["role"]
-                    new_dept = clean_dept if clean_dept is not None else existing["department"]
+                    new_role = valid_role if valid_role is not None else existing["role"]
+                    new_dept = valid_dept if valid_dept is not None else existing["department"]
                     if preferences is not None:
                         new_prefs_str = validate_preferences(preferences)
                     else:
@@ -150,21 +207,21 @@ class MemoryStore:
                         (new_role, new_dept, new_prefs_str, uid),
                     )
                 else:
-                    new_prefs_str = validate_preferences(preferences)
+                    new_prefs_str = validate_preferences(preferences) if preferences is not None else "{}"
                     cursor.execute(
                         """
                         INSERT INTO user_profile (user_id, role, department, onboarding_status, preferences)
                         VALUES (?, ?, ?, 'not_started', ?)
                         """,
-                        (uid, clean_role, clean_dept, new_prefs_str),
+                        (uid, valid_role, valid_dept, new_prefs_str),
                     )
 
             # Read-back verification
             profile = self.get_profile(uid)
             write_confirmed = True
-            if clean_role is not None and profile.get("role") != clean_role:
+            if valid_role is not None and profile.get("role") != valid_role:
                 write_confirmed = False
-            if clean_dept is not None and profile.get("department") != clean_dept:
+            if valid_dept is not None and profile.get("department") != valid_dept:
                 write_confirmed = False
 
             return {

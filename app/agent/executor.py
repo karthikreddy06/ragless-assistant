@@ -1,7 +1,7 @@
 import logging
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
-from app.agent.memory import MemoryStore, get_memory_store
+from app.agent.memory import MemoryStore, get_memory_store, has_explicit_profile_statement
 from app.agent.schemas import PlanStep, ToolResult
 from app.query_engine import process_query
 
@@ -40,6 +40,7 @@ def execute_memory(
     step: PlanStep,
     user_id: str,
     store: Optional[MemoryStore] = None,
+    question: Optional[str] = None,
 ) -> ToolResult:
     """
     Executes a validated memory operation for the server-injected user_id.
@@ -59,6 +60,16 @@ def execute_memory(
             return ToolResult(tool="memory", success=True, source="sqlite", data=data)
 
         elif op == "set_profile":
+            if question is not None and not has_explicit_profile_statement(question):
+                logger.warning("Rejected set_profile: query '%s' lacks explicit role or department statement", question)
+                return ToolResult(
+                    tool="memory",
+                    success=False,
+                    source="sqlite",
+                    data=None,
+                    error="set_profile is only permitted when the user text explicitly states their own role or department (e.g. 'my role is X', 'I am a X', 'I work in X').",
+                )
+
             res = mem_store.set_profile(
                 user_id=user_id,
                 role=args.get("role"),
@@ -70,8 +81,8 @@ def execute_memory(
                 tool="memory",
                 success=success,
                 source="sqlite",
-                data=res,
-                error=None if success else "Read-back verification failed for set_profile.",
+                data=res if success else None,
+                error=None if success else res.get("error", "Read-back verification or profile validation failed for set_profile."),
             )
 
         elif op == "mark_item_complete":
@@ -122,7 +133,12 @@ class ToolExecutor:
     def __init__(self, memory_store: Optional[MemoryStore] = None):
         self._memory_store = memory_store or get_memory_store()
 
-    def execute(self, step: PlanStep, user_id: str = "demo-user") -> ToolResult:
+    def execute(
+        self,
+        step: PlanStep,
+        user_id: str = "demo-user",
+        question: Optional[str] = None,
+    ) -> ToolResult:
         """Executes a single validated PlanStep through the tool registry."""
         tool_name = step.tool.strip().lower()
 
@@ -138,7 +154,7 @@ class ToolExecutor:
             return execute_company_knowledge(step.input)
 
         elif tool_name == "memory":
-            return execute_memory(step, user_id, store=self._memory_store)
+            return execute_memory(step, user_id, store=self._memory_store, question=question)
 
         return ToolResult(
             tool=step.tool,

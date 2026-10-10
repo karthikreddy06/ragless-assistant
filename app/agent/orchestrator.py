@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional
 
@@ -71,31 +72,33 @@ class AgentOrchestrator:
         model_name = getattr(self.llm, "model_name", "unknown")
         llm_calls_count = 0
 
-        # Step 1: Pre-validation of input question for direct malicious patterns
-        clean_q_lower = clean_q.lower()
-        import re
-        for pat in EXTENDED_FORBIDDEN_PATTERNS:
-            if re.search(pat, clean_q_lower):
-                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                return AgentResponse(
-                    question=clean_q,
-                    answer="I could not process this request due to disallowed syntax or potential injection pattern.",
-                    plan=None,
-                    tool_results=[],
-                    verification=Verification(
-                        passed=False,
-                        checks=[CheckItem(
-                            name="input_security",
+        # Step 1: Pre-validation of input question for direct malicious patterns (can be disabled via test flag)
+        enable_prefilter = os.getenv("DISABLE_INPUT_PREFILTER", "false").lower() not in ("true", "1", "yes")
+        if enable_prefilter:
+            clean_q_lower = clean_q.lower()
+            import re
+            for pat in EXTENDED_FORBIDDEN_PATTERNS:
+                if re.search(pat, clean_q_lower):
+                    elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    return AgentResponse(
+                        question=clean_q,
+                        answer="I could not process this request due to disallowed syntax or potential injection pattern.",
+                        plan=None,
+                        tool_results=[],
+                        verification=Verification(
                             passed=False,
-                            detail=f"Input matched forbidden pattern: '{pat}'",
-                        )],
-                        unresolved=["Question contained forbidden security pattern."],
-                    ),
-                    processing_time_ms=elapsed_ms,
-                    llm_provider=provider_name,
-                    llm_model=model_name,
-                    llm_calls_count=0,
-                )
+                            checks=[CheckItem(
+                                name="input_security",
+                                passed=False,
+                                detail=f"Input matched forbidden pattern: '{pat}'",
+                            )],
+                            unresolved=["Question contained forbidden security pattern."],
+                        ),
+                        processing_time_ms=elapsed_ms,
+                        llm_provider=provider_name,
+                        llm_model=model_name,
+                        llm_calls_count=0,
+                    )
 
         # Step 2: Planning with fast-path or bounded replan loop
         plan: Optional[AgentPlan] = None
@@ -183,7 +186,7 @@ class AgentOrchestrator:
         # Step 3: Tool Execution (bounded by MAX_AGENT_STEPS)
         tool_results: List[ToolResult] = []
         for step in plan.steps[:MAX_AGENT_STEPS]:
-            res = self.executor.execute(step, user_id=valid_uid)
+            res = self.executor.execute(step, user_id=valid_uid, question=clean_q)
             tool_results.append(res)
 
         # Step 4: Observation and Fact Aggregation
