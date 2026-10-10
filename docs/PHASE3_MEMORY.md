@@ -131,6 +131,15 @@ Every memory write operation performs an immediate secondary SQL query before re
 ### 5.5 Multi-Tenancy Boundary Notice
 The endpoint `GET /memory/{user_id}` and `AgentRequest.user_id` accept a string identifier for testing and prototyping. **No production multi-tenant authentication or session encryption is claimed in this prototype.** Production deployment requires upstream JWT/OAuth middleware.
 
+### 5.6 Role is a Display Label (No Privileges Granted)
+The `role` field stored in `user_profile` is strictly an informational display label. It grants no administrative privileges, authorization scopes, system capabilities, or elevated permissions within the assistant or backend. Privileged role values (`admin`, `administrator`, `root`, `superuser`, `sysadmin`, `system`, `owner`, `auth`) are explicitly prohibited and rejected by deterministic Python validation.
+
+### 5.7 Explicit User Intent Rule for All Memory Writes
+All write operations (`set_profile`, `mark_item_complete`, `set_onboarding_status`) require explicit affirmative user intent in the prompt, verified deterministically in Python at the `ToolExecutor` level:
+- `mark_item_complete`: user text must explicitly state a completion (`"I completed/finished/did X"`, `"mark X as done/complete"`), and the item must match the user text by title keyword or ID.
+- `set_onboarding_status`: user text must explicitly state starting or finishing onboarding (`"I've started onboarding"`, `"I finished onboarding"`).
+- `set_profile`: user text must contain an explicit role/department statement, and the assigned role or department value must appear verbatim (case-insensitive) in the user text.
+
 ---
 
 ## 6. Performance & Fast-Path Router (`app/agent/fast_path.py`)

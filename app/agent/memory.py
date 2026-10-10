@@ -22,9 +22,46 @@ MAX_ROLE_LEN = 40
 MIN_ROLE_LEN = 2
 
 SELF_ASSIGN_ROLE_DEPT_PATTERN = re.compile(
-    r"\b(?:my\s+role\s+is|i\s+am\s+(?:an?\s+)?|i\s+work\s+(?:in|as)\b|my\s+department\s+is|set\s+my\s+role\s+to|set\s+my\s+department\s+to)\b",
+    r"\b(?:"
+    r"my\s+role\s+is"
+    r"|set\s+my\s+role\s+to"
+    r"|my\s+department\s+is"
+    r"|set\s+my\s+department\s+to"
+    r"|i\s+work\s+(?:in|as)\b"
+    r"|i\s+am\s+(?:an?\s+)?(?:[a-zA-Z\-]+\s+)*(?:engineer|developer|intern|lead|manager|analyst|designer|architect|consultant|specialist|worker|employee)\b"
+    r")",
     re.IGNORECASE,
 )
+
+COMPLETION_INTENT_PATTERN = re.compile(
+    r"\b(?:"
+    r"i(?:'ve|\s+have)?\s+(?:completed|finished|did|done)\b"
+    r"|mark\s+.+?\s+(?:as\s+)?(?:done|complete|completed|finished)\b"
+    r")",
+    re.IGNORECASE,
+)
+
+START_ONBOARDING_PATTERN = re.compile(
+    r"\b(?:"
+    r"i(?:'ve|\s+have)?\s+started\s+onboarding"
+    r"|start(?:ed)?\s+onboarding"
+    r")\b",
+    re.IGNORECASE,
+)
+
+FINISH_ONBOARDING_PATTERN = re.compile(
+    r"\b(?:"
+    r"i(?:'ve|\s+have)?\s+(?:finished|completed)\s+onboarding"
+    r"|(?:finish(?:ed)?|complete(?:d)?)\s+onboarding"
+    r")\b",
+    re.IGNORECASE,
+)
+
+TITLE_STOP_WORDS = {
+    "and", "or", "the", "a", "an", "in", "on", "at", "to", "for", "of", "with",
+    "as", "by", "complete", "completed", "setup", "set", "review", "submit", "meet", "first",
+    "item", "items", "task", "tasks", "checklist"
+}
 
 
 def has_explicit_profile_statement(text: str) -> bool:
@@ -32,6 +69,123 @@ def has_explicit_profile_statement(text: str) -> bool:
     if not text:
         return False
     return bool(SELF_ASSIGN_ROLE_DEPT_PATTERN.search(text))
+
+
+def validate_profile_intent(
+    question: Optional[str],
+    role: Optional[str] = None,
+    department: Optional[str] = None,
+) -> bool:
+    """
+    Validates explicit intent for set_profile:
+    1. User text must explicitly state their own role or department.
+    2. Any specified role must appear verbatim (case-insensitive) in the user text.
+    3. Any specified department must appear verbatim (case-insensitive) in the user text.
+    """
+    if not question:
+        return False
+
+    q_lower = question.lower()
+    has_role = bool(role and str(role).strip())
+    has_dept = bool(department and str(department).strip())
+
+    if not has_role and not has_dept:
+        return False
+
+    if has_role:
+        r_clean = str(role).strip().lower()
+        if r_clean not in q_lower:
+            return False
+        role_explicit = (
+            bool(re.search(r"\b(?:my\s+role\s+is|set\s+my\s+role\s+to|i\s+work\s+as)\b", question, re.I))
+            or bool(re.search(r"\bi\s+am\s+(?:an?\s+)?" + re.escape(r_clean) + r"\b", question, re.I))
+            or has_explicit_profile_statement(question)
+        )
+        if not role_explicit:
+            return False
+
+    if has_dept:
+        d_clean = str(department).strip().lower()
+        if not re.search(r"\b" + re.escape(d_clean) + r"\b", question, re.I):
+            return False
+        dept_explicit = (
+            bool(re.search(r"\b(?:my\s+department\s+is|set\s+my\s+department\s+to|i\s+work\s+in)\b", question, re.I))
+            or has_explicit_profile_statement(question)
+        )
+        if not dept_explicit:
+            return False
+
+    return True
+
+
+def validate_item_completion_intent(
+    question: Optional[str],
+    item_id: int,
+    item_title: Optional[str] = None,
+) -> bool:
+    """
+    Validates explicit intent for mark_item_complete:
+    1. User text must clearly state completion ("I completed/finished/did X", "mark X as done/complete").
+    2. The item must match the user's text by title keyword or ID.
+    """
+    if not question:
+        return False
+
+    q_lower = question.lower()
+
+    # 1. Check completion phrasing intent
+    if not COMPLETION_INTENT_PATTERN.search(question):
+        return False
+
+    # 2. Check item match by ID
+    id_pattern = re.compile(r"\b" + str(item_id) + r"\b")
+    if id_pattern.search(question):
+        return True
+
+    # 3. Check item match by title keyword
+    if not item_title:
+        from app.database import get_connection
+        try:
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT title FROM onboarding_items WHERE id = ?", (item_id,))
+            row = cur.fetchone()
+            if row:
+                item_title = row["title"]
+        except Exception:
+            item_title = None
+        finally:
+            if "conn" in locals() and conn:
+                conn.close()
+
+    if item_title:
+        words = [re.sub(r"[^\w]", "", w.lower()) for w in item_title.split()]
+        keywords = [w for w in words if len(w) >= 2 and w not in TITLE_STOP_WORDS]
+        for kw in keywords:
+            if re.search(r"\b" + re.escape(kw) + r"\b", q_lower):
+                return True
+
+    return False
+
+
+def validate_onboarding_status_intent(question: Optional[str], status: str) -> bool:
+    """
+    Validates explicit intent for set_onboarding_status:
+    Allowed only on explicit user statements (e.g. 'I've started onboarding', 'I finished onboarding').
+    """
+    if not question:
+        return False
+
+    clean_status = (status or "").strip().lower()
+
+    if clean_status == "in_progress":
+        return bool(START_ONBOARDING_PATTERN.search(question))
+    elif clean_status == "completed":
+        return bool(FINISH_ONBOARDING_PATTERN.search(question))
+    elif clean_status == "not_started":
+        return bool(re.search(r"\b(?:haven't|have not)\s+started\s+onboarding\b", question, re.I))
+
+    return False
 
 
 def validate_role(role: Optional[str]) -> Optional[str]:
