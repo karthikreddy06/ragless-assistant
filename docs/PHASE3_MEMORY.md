@@ -208,6 +208,9 @@ Tested across 3 repetitions against local Ollama (`qwen2.5:3b`) on identical mul
   - Dynamic ID resolution guided by the catalog prompt injection rather than hardcoded pattern rules.
   - Requires 2 LLM calls per turn (planner JSON generation + grounded answer synthesis), with 100% plan validity when guided by dynamic catalog prompts.
 
+> [!NOTE]
+> **Profile Declaration Without Fast-Path**: During live testing with `FAST_PATH_ENABLED=false`, local `qwen2.5:3b` does not emit `set_profile` for `"My role is X"` (0/3 live runs; the model plans read-only lookup steps `get_profile` + `company_knowledge` instead). The deterministic fast-path router covers `"My role is X"` / `"Set my role to X"` and routes it to `set_profile`, ensuring reliable profile assignment.
+
 ---
 
 ## 8. Limitations & Scope for Phase 4
