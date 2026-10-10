@@ -43,12 +43,14 @@ INTERNAL_DB_TERMS = [
 COMPANY_SPECIFIC_TERMS = [
     r"\bthis\s+company\b",
     r"\bour\s+company\b",
-    r"\bour\s+(?:policy|leave|vacation|holiday|sick\s+leave|annual\s+leave)\b",
+    r"\b(?:the\s+company|company|our)\s+(?:policy|leave|vacation|holiday|sick\s+leave|annual\s+leave)\b",
+    r"\b(?:the\s+company|company|our)\s+(?:sick\s+leave|annual\s+leave)\s+(?:allowance|policy|days)\b",
     r"\bmy\s+onboarding\b",
     r"\bonboarding\s+(?:checklist|item|items|status|progress|tasks?)\b",
     r"\bhead\s+of\b",
     r"\bdepartment\s+head\b",
     r"\bwho\s+is\s+the\s+head\s+of\b",
+    r"\b(?:ceo|cto|cfo|executive|founder)\b",
     r"\bcompany\s+location\b",
     r"\bhow\s+many\s+employees\b",
     r"\btotal\s+employees\b",
@@ -114,7 +116,7 @@ def validate_outbound_web_query(
     # 5. SQL injection / query syntax
     for pat in EXTENDED_FORBIDDEN_PATTERNS:
         if re.search(pat, q_lower):
-            raise PlanValidationError(f"Outbound guard: web_research query contains forbidden syntax matching '{pat}'.")
+            raise PlanValidationError(f"Outbound guard: web_research query contains forbidden SQL or injection syntax matching '{pat}'.")
 
     # 6. Internal database structure leakage
     for pat in INTERNAL_DB_TERMS:
@@ -181,7 +183,7 @@ def validate_plan(
         # Company-specific questions may NOT be planned as web_research-only
         if all(step.tool.strip().lower() == "web_research" for step in plan.steps):
             raise PlanValidationError(
-                "Routing guard: company-specific questions cannot be planned as web_research-only."
+                "Routing guard: internal company-specific questions cannot be planned as web_research-only."
             )
         # Questions asking for internal head/leadership/onboarding/leave cannot use web_research
         if re.search(r"\b(?:head\s+of|leave\s+policy|onboarding)\b", user_question.lower()):

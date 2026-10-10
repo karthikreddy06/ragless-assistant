@@ -34,11 +34,11 @@ def redact_api_key(text: str, key: Optional[str] = None) -> str:
     redacted = text
     for c in candidates:
         if len(c) >= 6 and c in redacted:
-            redacted = redacted.replace(c, "[REDACTED]")
+            redacted = redacted.replace(c, "***REDACTED***")
 
     # Generic key pattern redaction
-    redacted = re.sub(r"tvly-[a-zA-Z0-9_-]{10,}", "[REDACTED]", redacted)
-    redacted = re.sub(r"sk-[a-zA-Z0-9_-]{10,}", "[REDACTED]", redacted)
+    redacted = re.sub(r"tvly-[a-zA-Z0-9_-]{10,}", "***REDACTED***", redacted)
+    redacted = re.sub(r"sk-[a-zA-Z0-9_-]{10,}", "***REDACTED***", redacted)
     return redacted
 
 
@@ -107,7 +107,29 @@ class WebSearchClient(ABC):
             "from_cache": bool,
         }
         """
-        pass
+class WebSearchError(Exception):
+    """Base exception for web search errors."""
+    pass
+
+
+class TavilyAuthError(WebSearchError):
+    """Raised on Tavily authentication failures (missing/invalid key)."""
+    pass
+
+
+class TavilyTimeoutError(WebSearchError):
+    """Raised when Tavily search requests time out."""
+    pass
+
+
+class TavilyRateLimitError(WebSearchError):
+    """Raised when Tavily rate limits are exceeded (HTTP 429)."""
+    pass
+
+
+class TavilyServerError(WebSearchError):
+    """Raised when Tavily server errors occur (HTTP 5xx)."""
+    pass
 
 
 class FakeWebSearchClient(WebSearchClient):
@@ -119,6 +141,7 @@ class FakeWebSearchClient(WebSearchClient):
         simulate_error: Optional[str] = None,
         simulate_status: Optional[int] = None,
         simulate_retries: int = 0,
+        error_mode: Optional[str] = None,
     ):
         self.canned_results = canned_results or [
             {
@@ -133,19 +156,31 @@ class FakeWebSearchClient(WebSearchClient):
             },
         ]
         self.simulate_error = simulate_error
+        if error_mode:
+            if error_mode == "auth":
+                self.simulate_error = "Tavily authentication failed (HTTP 401)"
+            elif error_mode == "timeout":
+                self.simulate_error = "Tavily search timed out"
+            elif error_mode == "server":
+                self.simulate_error = "Tavily service unavailable (HTTP 503)"
+            elif error_mode == "ratelimit":
+                self.simulate_error = "Tavily rate limit exceeded (HTTP 429)"
+            else:
+                self.simulate_error = f"Tavily error: {error_mode}"
+        self.error_mode = error_mode
         self.simulate_status = simulate_status
         self.simulate_retries = simulate_retries
         self.calls: List[Dict[str, Any]] = []
         self._cache = WebSearchCache()
 
     def search(self, query: str, max_results: int = 3) -> Dict[str, Any]:
-        self.calls.append({"query": query, "max_results": max_results})
-
         cached = self._cache.get(query)
         if cached is not None:
             res = dict(cached)
             res["from_cache"] = True
             return res
+
+        self.calls.append({"query": query, "max_results": max_results})
 
         if self.simulate_error:
             return {

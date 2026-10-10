@@ -90,7 +90,12 @@ class Verifier:
             list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
 
             numbers_in_answer = set(re.findall(r"\b\d+\b", clean_ans)) - list_markers
-            evidence_numbers = {f for f in extracted_facts if f.isdigit()}
+            evidence_numbers = set()
+            for f in extracted_facts:
+                if f.isdigit():
+                    evidence_numbers.add(f)
+                else:
+                    evidence_numbers.update(re.findall(r"\b\d+\b", str(f)))
             question_numbers = set(re.findall(r"\b\d+\b", question))
             allowed_numbers = evidence_numbers.union(question_numbers)
 
@@ -142,59 +147,39 @@ class Verifier:
             successful_web_data = [tr.data for tr in web_results if tr.success and tr.data]
 
             if successful_web_data:
-                # Check web_sources_cited: answer or sources must list URLs/titles
-                cited_markers = ["http://", "https://", "source:", "sources:", "[source", "www."]
-                has_citation = any(m in ans_lower for m in cited_markers)
-                if not has_citation:
-                    for d in successful_web_data:
-                        if isinstance(d, list):
-                            for item in d:
-                                if isinstance(item, dict):
-                                    t = item.get("title", "").lower()
-                                    if t and len(t) > 5 and t in ans_lower:
-                                        has_citation = True
-                                        break
+                flattened_results = []
+                for d in successful_web_data:
+                    if isinstance(d, list):
+                        flattened_results.extend([it for it in d if isinstance(it, dict)])
+                    elif isinstance(d, dict):
+                        flattened_results.append(d)
+
+                has_citation, citation_detail = self.verify_web_sources_cited(answer, flattened_results)
                 checks.append(CheckItem(
                     name="web_sources_cited",
                     passed=has_citation,
-                    detail="Web research sources and URLs cited in grounded response."
-                    if has_citation else
-                    "Warning: External web sources or URLs were not explicitly cited in answer.",
+                    detail=citation_detail,
                 ))
                 if not has_citation:
                     unresolved.append("External web research sources were not explicitly cited.")
 
-                # Check web_claims_grounded: numbers and version strings in answer must appear in snippets or evidence
-                clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
-                list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
-                list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
-
-                numbers_and_versions_ans = set(re.findall(r"\b\d+(?:\.\d+)*\b", clean_ans)) - list_markers
-
-                web_snippets_text = " ".join(
+                snippets_list = [
                     str(it.get("snippet", "")) + " " + str(it.get("title", ""))
-                    for d in successful_web_data if isinstance(d, list)
-                    for it in d if isinstance(it, dict)
+                    for it in flattened_results
+                ]
+                claims_grounded, claims_detail = self.verify_web_claims_grounded(
+                    answer=answer,
+                    snippets=snippets_list,
+                    allowed_facts=extracted_facts,
+                    question=question,
                 )
-                evidence_numbers = {f for f in extracted_facts}
-                question_numbers = set(re.findall(r"\b\d+(?:\.\d+)*\b", question))
-                allowed_claims = evidence_numbers.union(question_numbers)
-
-                unsupported_claims = set()
-                for claim in numbers_and_versions_ans:
-                    if claim not in allowed_claims and claim not in web_snippets_text:
-                        unsupported_claims.add(claim)
-
-                claims_grounded = len(unsupported_claims) == 0
                 checks.append(CheckItem(
                     name="web_claims_grounded",
                     passed=claims_grounded,
-                    detail="All numbers and version strings in web-assisted answer are grounded in retrieved snippets."
-                    if claims_grounded else
-                    f"Ungrounded claims or version strings found in answer: {sorted(unsupported_claims)}",
+                    detail=claims_detail,
                 ))
                 if not claims_grounded:
-                    unresolved.append(f"Answer contains ungrounded web claims: {sorted(unsupported_claims)}")
+                    unresolved.append(claims_detail)
             else:
                 external_refusal_markers = [
                     "could not find", "not found", "unavailable", "cannot verify", "could not verify",
@@ -224,6 +209,55 @@ class Verifier:
             checks=checks,
             unresolved=unresolved,
         )
+
+    def verify_web_sources_cited(
+        self,
+        answer: str,
+        web_results: List[Dict[str, Any]],
+    ) -> Tuple[bool, str]:
+        """Verifies that an answer cites external URLs or domains when web research was used."""
+        ans_lower = answer.lower()
+        if any(m in ans_lower for m in ["http://", "https://", "source:", "sources:", "[source", "www."]):
+            return True, "Web research sources and URLs cited in grounded response."
+
+        for item in web_results:
+            if isinstance(item, dict):
+                url = str(item.get("url", "")).lower()
+                domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url)
+                if domain_match:
+                    domain = domain_match.group(1).lower()
+                    if domain and len(domain) > 3 and domain in ans_lower:
+                        return True, "Web research sources and URLs cited in grounded response."
+
+        return False, "External web research sources or URLs were not explicitly cited."
+
+    def verify_web_claims_grounded(
+        self,
+        answer: str,
+        snippets: List[str],
+        allowed_facts: Optional[Set[str]] = None,
+        question: str = "",
+    ) -> Tuple[bool, str]:
+        """Verifies that numbers and versions in answer are grounded in web snippets or evidence facts."""
+        clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
+        list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
+        list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
+
+        numbers_and_versions_ans = set(re.findall(r"\b\d+(?:\.\d+)*\b", clean_ans)) - list_markers
+
+        web_snippets_text = " ".join(snippets)
+        allowed = set(allowed_facts or set())
+        if question:
+            allowed.update(re.findall(r"\b\d+(?:\.\d+)*\b", question))
+
+        unsupported_claims = set()
+        for claim in numbers_and_versions_ans:
+            if claim not in allowed and claim not in web_snippets_text:
+                unsupported_claims.add(claim)
+
+        if not unsupported_claims:
+            return True, "All numbers and version strings in web-assisted answer are grounded in retrieved snippets."
+        return False, f"Ungrounded claims or version strings found in answer: {sorted(unsupported_claims)}"
 
     def _collect_facts(self, data: Any, facts: Set[str]) -> None:
         """Recursively gathers primitive values from structured tool data."""

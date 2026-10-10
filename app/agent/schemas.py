@@ -232,3 +232,8 @@ class AgentResponse(BaseModel):
         default=None, description="Sources cited from external web research"
     )
     web_calls_count: Optional[int] = Field(default=None, description="Count of web research calls executed")
+
+    @property
+    def verified(self) -> bool:
+        return bool(self.verification and self.verification.passed)
+

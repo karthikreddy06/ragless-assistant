@@ -249,10 +249,12 @@ class ToolExecutor:
         self,
         memory_store: Optional[MemoryStore] = None,
         web_client: Optional[WebSearchClient] = None,
+        web_search_client: Optional[WebSearchClient] = None,
         max_web_calls: int = WEB_MAX_CALLS_PER_REQUEST,
+        db_path: Any = None,
     ):
         self._memory_store = memory_store or get_memory_store()
-        self._web_client = web_client
+        self._web_client = web_client or web_search_client
         self.max_web_calls = max_web_calls
         self._tainted = False
         self._web_calls_count = 0
@@ -275,8 +277,10 @@ class ToolExecutor:
         step: PlanStep,
         user_id: str = "demo-user",
         question: Optional[str] = None,
+        user_question: Optional[str] = None,
     ) -> ToolResult:
         """Executes a single validated PlanStep through the tool registry."""
+        effective_question = question or user_question
         tool_name = step.tool.strip().lower()
 
         # TAINT RULE ENFORCEMENT:
@@ -307,7 +311,7 @@ class ToolExecutor:
             return execute_company_knowledge(step.input)
 
         elif tool_name == "memory":
-            return execute_memory(step, user_id, store=self._memory_store, question=question)
+            return execute_memory(step, user_id, store=self._memory_store, question=effective_question)
 
         elif tool_name == "web_research":
             res = execute_web_research(
@@ -328,3 +332,6 @@ class ToolExecutor:
             data=None,
             error=f"Tool '{step.tool}' is not registered in ToolExecutor.",
         )
+
+    execute_step = execute
+
