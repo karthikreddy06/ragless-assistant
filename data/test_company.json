@@ -1,0 +1,23 @@
+{
+  "company": {
+    "name": "NextGen AI",
+    "location": "Chennai",
+    "employees": 1000
+  },
+  "departments": [
+    {
+      "name": "AI",
+      "employees": 200
+    },
+    {
+      "name": "Backend",
+      "employees": 150
+    }
+  ],
+  "leave_policy": [
+    {
+      "leave_type": "Annual Leave",
+      "days": 30
+    }
+  ]
+}

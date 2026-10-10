@@ -1,0 +1,79 @@
+{
+  "company": {
+    "name": "TechNova",
+    "location": "Hyderabad",
+    "employees": 500
+  },
+  "departments": [
+    {
+      "name": "AI",
+      "employees": 80
+    },
+    {
+      "name": "Backend",
+      "employees": 120
+    },
+    {
+      "name": "Data Science",
+      "employees": 70
+    }
+  ],
+  "leave_policy": [
+    {
+      "leave_type": "Annual Leave",
+      "days": 24
+    },
+    {
+      "leave_type": "Sick Leave",
+      "days": 12
+    },
+    {
+      "leave_type": "Casual Leave",
+      "days": 10
+    }
+  ],
+  "onboarding_items": [
+    {
+      "title": "Complete Security Training",
+      "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+      "department": null,
+      "day_due": 1
+    },
+    {
+      "title": "Submit HR and Tax Documents",
+      "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+      "department": null,
+      "day_due": 1
+    },
+    {
+      "title": "Set Up Company Email and Slack",
+      "description": "Configure 2FA security authentication and join essential team channels.",
+      "department": null,
+      "day_due": 2
+    },
+    {
+      "title": "Backend Technical Setup",
+      "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+      "department": "Backend",
+      "day_due": 2
+    },
+    {
+      "title": "AI Model Sandbox Setup",
+      "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+      "department": "AI",
+      "day_due": 2
+    },
+    {
+      "title": "Meet Team Lead and Buddy",
+      "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+      "department": null,
+      "day_due": 3
+    },
+    {
+      "title": "Review Production Architecture",
+      "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+      "department": "Backend",
+      "day_due": 4
+    }
+  ]
+}

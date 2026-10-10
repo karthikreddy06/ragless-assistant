@@ -1,0 +1,203 @@
+{
+  "provider": "ollama",
+  "model": "qwen2.5:3b",
+  "repetitions": 3,
+  "metrics": {
+    "plan_validity_percent": 100.0,
+    "remaining_count_correct": true,
+    "write_confirmation_rate_percent": 100.0,
+    "fast_path_trigger_rate_percent": 100.0,
+    "latency_p50_ms": 3913.57,
+    "latency_p95_ms": 6118.36,
+    "latency_mean_ms": 3949.97,
+    "avg_llm_calls_per_turn": 1
+  },
+  "runs": [
+    {
+      "repetition": 1,
+      "user_id": "demo-user-rep-1",
+      "latencies": [
+        5911.64,
+        2629.37,
+        3966.22
+      ],
+      "llm_calls": [
+        1,
+        1,
+        1
+      ],
+      "fast_path_count": 3,
+      "write_confirm_count": 1,
+      "total_writes": 1,
+      "count_correct": true,
+      "initial_total": 7,
+      "day1_remaining": 7,
+      "day3_remaining": 6,
+      "step_results": [
+        {
+          "day": 1,
+          "query": "Help me complete onboarding",
+          "latency_ms": 5911.64,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "Your onboarding is currently in progress. You have 7 items to complete, with 0 completed and 7 remaining. The first item to complete is \"Complete Security Training\"."
+        },
+        {
+          "day": 2,
+          "query": "I completed security training",
+          "latency_ms": 2629.37,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": [
+            {
+              "operation": "mark_item_complete",
+              "item_or_field": "Complete Security Training",
+              "confirmed": true
+            }
+          ],
+          "answer": "Complete Security Training has been marked as completed."
+        },
+        {
+          "day": 3,
+          "query": "What do I still need to do?",
+          "latency_ms": 3966.22,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You still need to complete 6 tasks. The remaining items are:\n\n- Submit HR and Tax Documents\n- Set Up Company Email and Slack\n- Backend Technical Setup\n- AI Model Sandbox Setup\n- Meet Team Lead and Buddy\n- Review Production Architecture"
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "user_id": "demo-user-rep-2",
+      "latencies": [
+        3831.38,
+        2663.87,
+        3933.58
+      ],
+      "llm_calls": [
+        1,
+        1,
+        1
+      ],
+      "fast_path_count": 3,
+      "write_confirm_count": 1,
+      "total_writes": 1,
+      "count_correct": true,
+      "initial_total": 7,
+      "day1_remaining": 7,
+      "day3_remaining": 6,
+      "step_results": [
+        {
+          "day": 1,
+          "query": "Help me complete onboarding",
+          "latency_ms": 3831.38,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "To complete your onboarding, you need to start with the following tasks:\n\n1. Complete Security Training\n2. Submit HR and Tax Documents\n3. Set Up Company Email and Slack\n\nThese tasks are due today."
+        },
+        {
+          "day": 2,
+          "query": "I completed security training",
+          "latency_ms": 2663.87,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": [
+            {
+              "operation": "mark_item_complete",
+              "item_or_field": "Complete Security Training",
+              "confirmed": true
+            }
+          ],
+          "answer": "Complete Security Training has been marked as completed."
+        },
+        {
+          "day": 3,
+          "query": "What do I still need to do?",
+          "latency_ms": 3933.58,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You still need to complete 6 items. The remaining items are:\n\n- Submit HR and Tax Documents\n- Set Up Company Email and Slack\n- Backend Technical Setup\n- AI Model Sandbox Setup\n- Meet Team Lead and Buddy\n- Review Production Architecture"
+        }
+      ]
+    },
+    {
+      "repetition": 3,
+      "user_id": "demo-user-rep-3",
+      "latencies": [
+        6118.36,
+        2581.74,
+        3913.57
+      ],
+      "llm_calls": [
+        1,
+        1,
+        1
+      ],
+      "fast_path_count": 3,
+      "write_confirm_count": 1,
+      "total_writes": 1,
+      "count_correct": true,
+      "initial_total": 7,
+      "day1_remaining": 7,
+      "day3_remaining": 6,
+      "step_results": [
+        {
+          "day": 1,
+          "query": "Help me complete onboarding",
+          "latency_ms": 6118.36,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": false,
+          "memory_writes": null,
+          "answer": "You have 7 items in your onboarding process, all of which are currently in progress. You need to complete the following tasks by their respective due dates:\n\n1. Complete Security Training (day due: 1)\n2. Submit HR and Tax Documents (day due: 1)\n3. Set Up Company Email and Slack (day due: 2)\n4. Backend Technical Setup (day due: 2)\n5. AI Model Sandbox Setup (day due: 2)\n6. Meet Team Lead and Buddy (day due: 3)\n7. Review Production Architecture (day due: 4)\n\nPlease ensure all tasks are completed by their respective due dates."
+        },
+        {
+          "day": 2,
+          "query": "I completed security training",
+          "latency_ms": 2581.74,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": [
+            {
+              "operation": "mark_item_complete",
+              "item_or_field": "Complete Security Training",
+              "confirmed": true
+            }
+          ],
+          "answer": "Complete Security Training has been marked as completed."
+        },
+        {
+          "day": 3,
+          "query": "What do I still need to do?",
+          "latency_ms": 3913.57,
+          "llm_calls": 1,
+          "plan_valid": true,
+          "op_matched": true,
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You still need to complete the following tasks:\n\n1. Submit HR and Tax Documents\n2. Set Up Company Email and Slack\n3. Backend Technical Setup\n4. AI Model Sandbox Setup\n5. Meet Team Lead and Buddy\n6. Review Production Architecture"
+        }
+      ]
+    }
+  ]
+}
