@@ -6,7 +6,7 @@ from app.agent.executor import ToolExecutor
 from app.agent.llm import LLMClient
 from app.agent.orchestrator import AgentOrchestrator
 from app.agent.planner import AgentPlanner, PlanParsingError
-from app.agent.schemas import AgentPlan, PlanStep
+from app.agent.schemas import AgentPlan, PlanStep, ToolResult
 from app.agent.validator import PlanValidationError, validate_plan
 from app.agent.verifier import Verifier
 from app.main import app
@@ -253,6 +253,53 @@ class TestAgentExecutionAndVerification(unittest.TestCase):
         response = orchestrator.run("Large composite question")
         self.assertFalse(response.verification.passed)
         self.assertEqual(len(response.tool_results), 0)
+
+    def test_verifier_allows_numbered_list_of_six_items(self):
+        """Verify that a response containing a numbered list of 6 items passes verification without false ungrounded flags."""
+        verifier = Verifier()
+        plan = AgentPlan(
+            goal="List onboarding tasks",
+            steps=[PlanStep(tool="memory", operation="get_progress", args={})]
+        )
+        tool_results = [
+            ToolResult(
+                tool="memory",
+                success=True,
+                source="sqlite",
+                data={
+                    "total_items": 7,
+                    "completed_count": 1,
+                    "remaining_count": 6,
+                    "remaining_items": [
+                        {"id": 101, "title": "Submit HR Documents"},
+                        {"id": 102, "title": "Set Up Slack"},
+                        {"id": 103, "title": "Technical Setup"},
+                        {"id": 104, "title": "Sandbox Setup"},
+                        {"id": 105, "title": "Meet Team Lead"},
+                        {"id": 106, "title": "Review Architecture"},
+                    ]
+                }
+            )
+        ]
+        answer_with_numbered_list = (
+            "You have 6 remaining items:\n"
+            "1. Submit HR Documents\n"
+            "2. Set Up Slack\n"
+            "3. Technical Setup\n"
+            "4. Sandbox Setup\n"
+            "5. Meet Team Lead\n"
+            "6. Review Architecture"
+        )
+        res = verifier.verify(
+            question="What do I still need to do?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer_with_numbered_list,
+        )
+        self.assertTrue(res.passed, f"Verifier failed with unresolved: {res.unresolved}")
+        grounding_check = next((c for c in res.checks if c.name == "evidence_fact_grounding"), None)
+        self.assertIsNotNone(grounding_check)
+        self.assertTrue(grounding_check.passed)
 
 
 class TestAgentEndpoint(unittest.TestCase):

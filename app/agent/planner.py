@@ -4,8 +4,26 @@ import re
 from typing import Any, Dict
 
 from app.agent.llm import LLMClient
+from app.database import get_onboarding_items
 
 logger = logging.getLogger(__name__)
+
+
+def _build_checklist_catalog_prompt() -> str:
+    """Build dynamic catalog of onboarding items and IDs for the planner."""
+    try:
+        items = get_onboarding_items()
+        if items:
+            lines = "\n".join(f"  - Item ID {it['id']}: {it['title']}" for it in items)
+            return (
+                "\nAvailable Onboarding Checklist Items Catalog:\n"
+                f"{lines}\n"
+                "When user states they completed or finished a checklist item, use 'mark_item_complete' "
+                "with the matching integer 'item_id' from this catalog.\n"
+            )
+    except Exception:
+        pass
+    return ""
 
 
 class PlanParsingError(ValueError):
@@ -27,6 +45,8 @@ class AgentPlanner:
         Generates an unvalidated plan dictionary from the LLM.
         Strips markdown code fences and parses JSON strictly.
         """
+        catalog_section = _build_checklist_catalog_prompt()
+
         system_prompt = (
             "You are a strict task planner for an enterprise knowledge assistant.\n"
             "Your job is to break down a user question into sequential steps using ONLY allowed tools.\n\n"
@@ -36,11 +56,12 @@ class AgentPlanner:
             "- 'memory': Persistent structured user profile and onboarding progress tracker.\n"
             "  Parameter: 'operation' (one of: 'get_profile', 'get_progress', 'set_profile', 'mark_item_complete', 'set_onboarding_status')\n"
             "  Parameter: 'args' (structured object for operation parameters, e.g. {'item_id': 1} or {'department': 'Backend'}).\n\n"
+            f"{catalog_section}"
             "When to use Memory operations:\n"
             "- 'get_progress': User asks what onboarding tasks are remaining, left to do, or asks for help completing onboarding.\n"
             "- 'get_profile': User asks for their own profile, role, or department.\n"
             "- 'set_profile': User explicitly specifies their role or department (args: {'role': '...', 'department': '...'}).\n"
-            "- 'mark_item_complete': User explicitly states they completed or finished a checklist item (args: {'item_id': <integer>}).\n"
+            "- 'mark_item_complete': User explicitly states they completed or finished a checklist item (args: {'item_id': <integer ID from catalog>}).\n"
             "- 'set_onboarding_status': User explicitly requests changing their status (args: {'status': 'not_started'|'in_progress'|'completed'}).\n\n"
             "STRICT RULES:\n"
             "1. ONLY use 'company_knowledge' or 'memory'. Never invent tools (e.g. 'execute_sql', 'create_task', 'run_shell' are forbidden).\n"

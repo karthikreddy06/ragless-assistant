@@ -1,6 +1,7 @@
 import json
 import unittest
 from unittest.mock import patch
+import pytest
 import requests
 
 from app.database import (
@@ -252,6 +253,7 @@ class TestOllamaUnavailableHandling(unittest.TestCase):
             _call_ollama_generate("test prompt")
 
 
+@pytest.mark.slow
 class TestEndToEndPipelineOnTechNova(unittest.TestCase):
     """End-to-end integration tests using local Ollama (qwen2.5:3b) + dynamic TechNova knowledge."""
 
@@ -301,6 +303,7 @@ class TestEndToEndPipelineOnTechNova(unittest.TestCase):
         self.assertIsNone(res["retrieved_data"])
 
 
+@pytest.mark.slow
 class TestDynamicKnowledgeReplacementRegression(unittest.TestCase):
     """
     Dedicated regression test verifying complete knowledge replacement:
@@ -361,6 +364,7 @@ class TestDynamicKnowledgeReplacementRegression(unittest.TestCase):
         self.assertIn("could not find", res_b_ceo["answer"].lower())
 
 
+@pytest.mark.slow
 class TestPhase5MultiQueryReasoning(unittest.TestCase):
     """
     Phase 5 comprehensive multi-query, multi-table, security, and grounding test suite.

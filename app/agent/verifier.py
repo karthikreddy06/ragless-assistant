@@ -68,7 +68,10 @@ class Verifier:
         if not has_any_data:
             has_refusal = any(marker in ans_lower for marker in self.REFUSAL_MARKERS)
             # Ensure model didn't hallucinate numbers when no evidence exists
-            numbers_in_answer = re.findall(r"\b\d+\b", answer)
+            clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
+            list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
+            list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
+            numbers_in_answer = [n for n in re.findall(r"\b\d+\b", clean_ans) if n not in list_markers]
             no_hallucinated_numbers = len(numbers_in_answer) == 0
 
             passed_empty_grounding = has_refusal and no_hallucinated_numbers
@@ -81,14 +84,17 @@ class Verifier:
             ))
         else:
             # 4. Grounding Check: Numbers/facts in answer must appear in evidence or question
-            numbers_in_answer = set(re.findall(r"\b\d+\b", answer))
+            # Exclude structural numbered-list markers (e.g. "1.", "2)", markdown list prefixes)
+            clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
+            list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
+            list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
+
+            numbers_in_answer = set(re.findall(r"\b\d+\b", clean_ans)) - list_markers
             evidence_numbers = {f for f in extracted_facts if f.isdigit()}
             question_numbers = set(re.findall(r"\b\d+\b", question))
             allowed_numbers = evidence_numbers.union(question_numbers)
 
             unsupported_numbers = numbers_in_answer - allowed_numbers
-            # Ignore basic step list numbers if 1 or 2
-            unsupported_numbers = {n for n in unsupported_numbers if n not in {"1", "2", "3", "4", "5"}}
 
             numbers_grounded = len(unsupported_numbers) == 0
             checks.append(CheckItem(

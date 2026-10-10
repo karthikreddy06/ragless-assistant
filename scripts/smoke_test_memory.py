@@ -24,6 +24,14 @@ def run_demo_scenario(repetition: int) -> Dict[str, Any]:
 
     # Create fresh user ID per repetition to test clean lifecycle
     user_id = f"demo-user-rep-{repetition}"
+    conn = get_memory_store().get_connection()
+    try:
+        with conn:
+            conn.execute("DELETE FROM user_completed_items WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM user_profile WHERE user_id = ?", (user_id,))
+    finally:
+        conn.close()
+
     client = OllamaClient(timeout=120)
     orchestrator = AgentOrchestrator(llm_client=client)
 
@@ -59,9 +67,10 @@ def run_demo_scenario(repetition: int) -> Dict[str, Any]:
         has_memory = bool(resp.memory_used)
         op_matched = False
         if resp.plan and resp.plan.steps:
-            first_step = resp.plan.steps[0]
-            if first_step.tool == "memory" and first_step.operation == expected_op:
-                op_matched = True
+            for s in resp.plan.steps:
+                if s.tool == "memory" and s.operation == expected_op:
+                    op_matched = True
+                    break
 
         # Check if fast-path handled it (0 planner calls)
         fast_path_triggered = (resp.llm_calls_count is not None and resp.llm_calls_count <= 1)
@@ -75,14 +84,18 @@ def run_demo_scenario(repetition: int) -> Dict[str, Any]:
                 if w.get("confirmed"):
                     write_confirm_count += 1
 
-        # Track remaining counts
-        if day == 1:
-            if resp.tool_results and resp.tool_results[0].data:
-                day1_remaining = resp.tool_results[0].data.get("remaining_count", 0)
-                initial_total_items = resp.tool_results[0].data.get("total_items", 0)
-        elif day == 3:
-            if resp.tool_results and resp.tool_results[0].data:
-                day3_remaining = resp.tool_results[0].data.get("remaining_count", 0)
+        # Track remaining counts from memory tool result
+        memory_data = None
+        for tr in resp.tool_results:
+            if tr.tool == "memory" and isinstance(tr.data, dict):
+                memory_data = tr.data
+                break
+
+        if day == 1 and memory_data:
+            day1_remaining = memory_data.get("remaining_count", 0)
+            initial_total_items = memory_data.get("total_items", 0)
+        elif day == 3 and memory_data:
+            day3_remaining = memory_data.get("remaining_count", 0)
 
         print(f"\n[Day {day}] User ({user_id}): \"{q}\"")
         print(f"  Plan: {resp.plan.goal if resp.plan else 'NO PLAN'} -> {[s.tool + '.' + (s.operation or '') for s in (resp.plan.steps if resp.plan else [])]}")
@@ -97,7 +110,10 @@ def run_demo_scenario(repetition: int) -> Dict[str, Any]:
             "llm_calls": resp.llm_calls_count,
             "plan_valid": plan_valid,
             "op_matched": op_matched,
-            "verification_passed": resp.verification.passed,
+            "plan": resp.plan.model_dump() if resp.plan else None,
+            "tool_results": [tr.model_dump() for tr in resp.tool_results] if resp.tool_results else [],
+            "verification": resp.verification.model_dump() if resp.verification else None,
+            "verification_passed": resp.verification.passed if resp.verification else False,
             "memory_writes": resp.memory_writes,
             "answer": resp.answer,
         })
@@ -122,9 +138,15 @@ def run_demo_scenario(repetition: int) -> Dict[str, Any]:
 
 
 def main():
+    import os
+    from app.agent.fast_path import is_fast_path_enabled
+
+    fast_path_on = is_fast_path_enabled()
+    mode_str = "FAST-PATH ENABLED" if fast_path_on else "FAST-PATH DISABLED (qwen2.5:3b Planner)"
+
     print("==================================================")
     print("PHASE 3 LIVE SMOKE SUITE: PERSISTENT MEMORY")
-    print("Provider: Ollama (qwen2.5:3b) | Repetitions: 3")
+    print(f"Provider: Ollama (qwen2.5:3b) | Mode: {mode_str} | Repetitions: 3")
     print("==================================================")
 
     runs = []
@@ -136,11 +158,15 @@ def main():
     all_latencies = [lat for r in runs for lat in r["latencies"]]
     all_llm_calls = [c for r in runs for c in r["llm_calls"]]
     total_steps = len(all_latencies)
+    valid_plans = sum(1 for r in runs for s in r["step_results"] if s["plan_valid"])
+    matched_ops = sum(1 for r in runs for s in r["step_results"] if s["op_matched"])
     total_fast_path = sum(r["fast_path_count"] for r in runs)
     total_writes = sum(r["total_writes"] for r in runs)
     confirmed_writes = sum(r["write_confirm_count"] for r in runs)
     all_counts_correct = all(r["count_correct"] for r in runs)
 
+    plan_valid_rate = round((valid_plans / total_steps) * 100, 1)
+    correct_op_rate = round((matched_ops / total_steps) * 100, 1)
     p50_lat = round(statistics.median(all_latencies), 2)
     p95_lat = round(sorted(all_latencies)[int(len(all_latencies) * 0.95)], 2)
     mean_lat = round(statistics.mean(all_latencies), 2)
@@ -148,10 +174,11 @@ def main():
     write_confirm_rate = round((confirmed_writes / max(1, total_writes)) * 100, 1)
 
     print("\n" + "=" * 60)
-    print("PHASE 3 LIVE SMOKE RESULTS SUMMARY")
+    print(f"PHASE 3 LIVE SMOKE RESULTS ({mode_str})")
     print("=" * 60)
     print(f"Total Workflow Runs:        3 repetitions (9 turns total)")
-    print(f"Plan Validity Rate:         100.0%")
+    print(f"Plan Validity Rate:         {plan_valid_rate}% ({valid_plans}/{total_steps})")
+    print(f"Correct Op Selection Rate:  {correct_op_rate}% ({matched_ops}/{total_steps})")
     print(f"Remaining Count Correct:    {'100.0% (PASSED)' if all_counts_correct else 'FAIL'}")
     print(f"Write Confirmation Rate:    {write_confirm_rate}% ({confirmed_writes}/{total_writes})")
     print(f"Fast-Path Trigger Rate:     {fast_path_rate}% ({total_fast_path}/{total_steps})")
@@ -160,16 +187,20 @@ def main():
     print(f"Latency Mean:               {mean_lat} ms")
     print(f"Avg LLM Calls per Request:  {round(statistics.mean(all_llm_calls), 2)}")
 
-    # Save results to docs/results/phase3_smoke.json
+    # Save results to docs/results/
     out_dir = Path("docs/results")
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_file = out_dir / "phase3_smoke.json"
+    suffix = "fastpath" if fast_path_on else "planner"
+    out_file = out_dir / f"phase3_smoke_{suffix}.json"
     summary_data = {
         "provider": "ollama",
         "model": "qwen2.5:3b",
+        "mode": "fast_path" if fast_path_on else "llm_planner",
+        "fast_path_enabled": fast_path_on,
         "repetitions": 3,
         "metrics": {
-            "plan_validity_percent": 100.0,
+            "plan_validity_percent": plan_valid_rate,
+            "correct_operation_rate_percent": correct_op_rate,
             "remaining_count_correct": all_counts_correct,
             "write_confirmation_rate_percent": write_confirm_rate,
             "fast_path_trigger_rate_percent": fast_path_rate,
@@ -182,6 +213,12 @@ def main():
     }
     with open(out_file, "w") as f:
         json.dump(summary_data, f, indent=2)
+
+    # Also keep general phase3_smoke.json updated
+    with open(out_dir / "phase3_smoke.json", "w") as f:
+        json.dump(summary_data, f, indent=2)
+
+    print(f"\nDetailed metrics saved to: {out_file}")
 
     print(f"\nDetailed metrics saved to: {out_file}")
 

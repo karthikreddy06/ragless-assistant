@@ -21,4 +21,7 @@ ENV/
 *.swp
 *.swo
 .DS_Store
-Thumbs.db
+# Database
+*.db
+*.sqlite
+*.sqlite3

@@ -9,7 +9,14 @@ from app.database import get_onboarding_items
 logger = logging.getLogger(__name__)
 
 # Config toggle to enable or disable fast-path routing
-ENABLE_FAST_PATH: bool = os.getenv("ENABLE_FAST_PATH", "true").lower() in ("true", "1", "yes")
+FAST_PATH_ENABLED: bool = os.getenv("FAST_PATH_ENABLED", os.getenv("ENABLE_FAST_PATH", "true")).lower() in ("true", "1", "yes")
+ENABLE_FAST_PATH: bool = FAST_PATH_ENABLED
+
+
+def is_fast_path_enabled() -> bool:
+    """Check dynamic runtime environment variable value."""
+    val = os.getenv("FAST_PATH_ENABLED", os.getenv("ENABLE_FAST_PATH", "true"))
+    return val.strip().lower() in ("true", "1", "yes")
 
 
 def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
@@ -20,7 +27,7 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
     Returns an unvalidated AgentPlan (which must be validated by validate_plan),
     or None if no fast-path pattern matches.
     """
-    if not ENABLE_FAST_PATH:
+    if not is_fast_path_enabled():
         return None
 
     q_lower = question.strip().lower()

@@ -145,34 +145,59 @@ Local small language models (`qwen2.5:3b`) can be sensitive to complex multi-ste
 ## 7. Measured Evidence & Verification
 
 ### 7.1 Automated Test Suite
-- **Memory Unit Tests** (`tests/test_memory.py`): **21 / 21 PASS**
+- **Memory Unit Tests** (`tests/test_memory.py`): **26 / 26 PASS**
   - Profile retrieval & updates
   - Onboarding checklist loading & department filtering
   - Item completion & idempotent re-completion
   - Progress computation & remaining item diffing
   - Fast-path plan synthesis
-  - Schema `extra="forbid"` & `user_id` rejection
+  - Schema `extra="forbid"` & `user_id` rejection (`test_plan_containing_user_id_or_unknown_field_rejected`)
+  - Prompt injection identity protection (`test_prompt_injection_tries_to_emit_other_user_id_rejected`)
+  - Stored preference injection immunity (`test_stored_preference_injection_causes_nothing_to_run`)
+  - Read-only intent non-write guarantee (`test_what_is_security_training_does_not_write`)
+  - Persistence across orchestrator restart (`test_persistence_across_orchestrator_restart`)
+  - Multi-turn Day 1 -> Day 3 progress decrement (`test_multi_turn_day1_to_day3_progress_decrements`)
   - Read-back write verification
 - **Agent Regression Suite** (`tests/test_agent.py`): **20 / 20 PASS**
 - **Nebius Integration Suite** (`tests/test_nebius.py`): **20 / 20 PASS**
-- **Baseline Suite** (`tests/test_backend.py`): **28 / 28 PASS**
-- **Total Automated Tests**: **89 / 89 PASS (100%)**
+- **Baseline Suite** (`tests/test_backend.py`): **49 / 49 PASS**
+- **Total Automated Tests**: **115 / 115 PASS (100%)**
 
 ### 7.2 Multi-Day Live Smoke Benchmark (`scripts/smoke_test_memory.py`)
-Tested across 3 repetitions against local Ollama (`qwen2.5:3b`):
+Tested across 3 repetitions against local Ollama (`qwen2.5:3b`) on identical multi-day onboarding flows:
 - **Scenario**: Day 1 ("Help me complete onboarding") → Day 2 ("I completed security training") → Day 3 ("What do I still need to do?")
 
-| Metric | Result |
-|---|---|
-| Total Multi-Day Runs | 3 repetitions (9 turns total) |
-| Plan Validity Rate | **100.0%** (9/9) |
-| Remaining Count Correctness | **100.0%** (7 items → Day 2 mark → 6 items remaining) |
-| Write Confirmation Rate | **100.0%** (3/3 writes confirmed by read-back) |
-| Fast-Path Trigger Rate | **100.0%** (9/9) |
-| Latency p50 | **3,894.81 ms** |
-| Latency p95 | **6,671.54 ms** |
-| Latency Mean | **3,861.16 ms** |
-| Avg LLM Calls per Request | **1** |
+#### Measured Results: Mode A vs. Mode B
+
+| Metric | Fast-Path ENABLED (`FAST_PATH_ENABLED=true`) | Real LLM Planner (`FAST_PATH_ENABLED=false`) |
+|---|---|---|
+| Total Multi-Day Runs | 3 repetitions (9 turns total) | 3 repetitions (9 turns total) |
+| Plan Validity Rate (first attempt) | **100.0%** (9/9) | **100.0%** (9/9) |
+| Correct Operation Selection | **100.0%** (9/9) | **100.0%** (9/9) |
+| Remaining Count Correctness | **100.0%** (7 items → Day 2 mark → 6 remaining) | **100.0%** (7 items → Day 2 mark → 6 remaining) |
+| Write Confirmation Rate | **100.0%** (3/3 confirmed via read-back) | **100.0%** (3/3 confirmed via read-back) |
+| Fast-Path Trigger Rate | **100.0%** (9/9) | **0.0%** (0/9) |
+| Avg LLM Calls per Turn | **1.0** (synthesis only) | **2.0** (1 planner + 1 synthesis) |
+| Latency p50 | **6,596.83 ms** | **11,667.66 ms** |
+| Latency p95 | **9,177.41 ms** | **23,986.41 ms** |
+| Latency Mean | **5,657.83 ms** | **13,149.10 ms** |
+
+> [!NOTE]
+> **Scope of 100% Benchmark Result & Catalog Guidance**:
+> 1. **Checklist Catalog in Planner Prompt**: The planner system prompt dynamically includes the active onboarding checklist catalog (`Available Onboarding Checklist Items Catalog: Item ID X: <Title>`) queried from SQLite. This context allows the local `qwen2.5:3b` model to accurately select the correct integer item ID (e.g. ID 128 for Security Training) rather than hallucinating random numbers.
+> 2. **Demo Scenario Scope**: The **100% plan validity and correctness results are measured specifically for the target demo scenario** (Day 1 onboarding inquiry → Day 2 security training completion → Day 3 remaining tasks inquiry). While this validates the core architecture and memory lifecycle, it does not imply 100% success across arbitrary or out-of-distribution user requests without fast-path support.
+
+### 7.3 Coverage Analysis: Fast-Path vs. LLM Planner
+- **What Fast-Path Covers**: High-frequency, well-patterned operational intents:
+  - Common progress queries ("help me complete onboarding", "what do I still need to do?", "check onboarding progress").
+  - Direct completion phrases matching known item IDs or title keywords ("I completed security training", "mark item 2 complete").
+  - Standard profile queries ("who am I", "what is my department") and profile assignments ("my department is Backend").
+  - Fast-path eliminates 1 LLM roundtrip, cutting p50 latency by ~43% and mean latency by ~57%, while maintaining identical schema validation and database execution.
+- **What LLM Planner Covers**: Flexible, free-form, and compound multi-step queries:
+  - Multi-tool compound plans (e.g. Day 1: querying company knowledge checklist items alongside user progress: `[company_knowledge, memory.get_progress]`).
+  - Phrasing with novel sentence structure, reasoning, or contextual nuances outside regex patterns.
+  - Dynamic ID resolution guided by the catalog prompt injection rather than hardcoded pattern rules.
+  - Requires 2 LLM calls per turn (planner JSON generation + grounded answer synthesis), with 100% plan validity when guided by dynamic catalog prompts.
 
 ---
 

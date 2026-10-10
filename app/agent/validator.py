@@ -20,6 +20,8 @@ EXTENDED_FORBIDDEN_PATTERNS = FORBIDDEN_SQL_PATTERNS + [
     r"\bxp_\w+",
     r"\bscript\b",
     r"<script>",
+    r"\bignore\s+(?:all\s+|any\s+)?(?:previous\s+|prior\s+)?instructions\b",
+    r"\bdisregard\s+(?:all\s+|any\s+)?(?:previous\s+|prior\s+)?instructions\b",
 ]
 
 

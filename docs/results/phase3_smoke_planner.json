@@ -1,0 +1,1238 @@
+{
+  "provider": "ollama",
+  "model": "qwen2.5:3b",
+  "mode": "llm_planner",
+  "fast_path_enabled": false,
+  "repetitions": 3,
+  "metrics": {
+    "plan_validity_percent": 100.0,
+    "correct_operation_rate_percent": 100.0,
+    "remaining_count_correct": true,
+    "write_confirmation_rate_percent": 100.0,
+    "fast_path_trigger_rate_percent": 0.0,
+    "latency_p50_ms": 11667.66,
+    "latency_p95_ms": 23986.41,
+    "latency_mean_ms": 13149.1,
+    "avg_llm_calls_per_turn": 2
+  },
+  "runs": [
+    {
+      "repetition": 1,
+      "user_id": "demo-user-rep-1",
+      "latencies": [
+        18001.43,
+        6588.81,
+        7597.71
+      ],
+      "llm_calls": [
+        2,
+        2,
+        2
+      ],
+      "fast_path_count": 0,
+      "write_confirm_count": 1,
+      "total_writes": 1,
+      "count_correct": true,
+      "initial_total": 7,
+      "day1_remaining": 7,
+      "day3_remaining": 6,
+      "step_results": [
+        {
+          "day": 1,
+          "query": "Help me complete onboarding",
+          "latency_ms": 18001.43,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Generate a plan to assist the user in completing their onboarding process",
+            "steps": [
+              {
+                "tool": "company_knowledge",
+                "input": "onboarding checklist items",
+                "operation": null,
+                "args": null
+              },
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "get_progress",
+                "args": {}
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "company_knowledge",
+              "success": true,
+              "source": "sqlite",
+              "data": [
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 128,
+                  "title": "Complete Security Training",
+                  "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                  "department": null,
+                  "day_due": 1
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 129,
+                  "title": "Submit HR and Tax Documents",
+                  "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                  "department": null,
+                  "day_due": 1
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 130,
+                  "title": "Set Up Company Email and Slack",
+                  "description": "Configure 2FA security authentication and join essential team channels.",
+                  "department": null,
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 131,
+                  "title": "Backend Technical Setup",
+                  "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                  "department": "Backend",
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 132,
+                  "title": "AI Model Sandbox Setup",
+                  "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                  "department": "AI",
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 133,
+                  "title": "Meet Team Lead and Buddy",
+                  "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                  "department": null,
+                  "day_due": 3
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 134,
+                  "title": "Review Production Architecture",
+                  "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                  "department": "Backend",
+                  "day_due": 4
+                }
+              ],
+              "error": null
+            },
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "user_id": "demo-user-rep-1",
+                "role": null,
+                "department": null,
+                "onboarding_status": "not_started",
+                "total_items": 7,
+                "completed_count": 0,
+                "remaining_count": 7,
+                "progress_percent": 0.0,
+                "completed_items": [],
+                "remaining_items": [
+                  {
+                    "id": 128,
+                    "title": "Complete Security Training",
+                    "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 129,
+                    "title": "Submit HR and Tax Documents",
+                    "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 130,
+                    "title": "Set Up Company Email and Slack",
+                    "description": "Configure 2FA security authentication and join essential team channels.",
+                    "department": null,
+                    "day_due": 2
+                  },
+                  {
+                    "id": 131,
+                    "title": "Backend Technical Setup",
+                    "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                    "department": "Backend",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 132,
+                    "title": "AI Model Sandbox Setup",
+                    "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                    "department": "AI",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 133,
+                    "title": "Meet Team Lead and Buddy",
+                    "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                    "department": null,
+                    "day_due": 3
+                  },
+                  {
+                    "id": 134,
+                    "title": "Review Production Architecture",
+                    "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                    "department": "Backend",
+                    "day_due": 4
+                  }
+                ]
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": false,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 2 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": false,
+                "detail": "Potentially ungrounded numbers found in answer: ['6']"
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": false,
+          "memory_writes": null,
+          "answer": "You have 7 items to complete for onboarding. You have not started any of them. Here are the remaining items:\n\n1. Complete Security Training\n2. Submit HR and Tax Documents\n3. Set Up Company Email and Slack\n4. Backend Technical Setup\n5. AI Model Sandbox Setup\n6. Meet Team Lead and Buddy\n7. Review Production Architecture"
+        },
+        {
+          "day": 2,
+          "query": "I completed security training",
+          "latency_ms": 6588.81,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Mark the completion of the security training checklist item",
+            "steps": [
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "mark_item_complete",
+                "args": {
+                  "item_id": 128
+                }
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "success": true,
+                "operation": "mark_item_complete",
+                "user_id": "demo-user-rep-1",
+                "item_id": 128,
+                "item_title": "Complete Security Training",
+                "write_confirmed": true
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 1 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "write_confirmed",
+                "passed": true,
+                "detail": "Memory write 'mark_item_complete' confirmed via database read-back."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": [
+            {
+              "operation": "mark_item_complete",
+              "item_or_field": "Complete Security Training",
+              "confirmed": true
+            }
+          ],
+          "answer": "Complete Security Training has been marked as completed."
+        },
+        {
+          "day": 3,
+          "query": "What do I still need to do?",
+          "latency_ms": 7597.71,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Determine the remaining onboarding tasks for the user",
+            "steps": [
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "get_progress",
+                "args": {}
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "user_id": "demo-user-rep-1",
+                "role": null,
+                "department": null,
+                "onboarding_status": "in_progress",
+                "total_items": 7,
+                "completed_count": 1,
+                "remaining_count": 6,
+                "progress_percent": 14.3,
+                "completed_items": [
+                  {
+                    "id": 128,
+                    "title": "Complete Security Training",
+                    "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                    "department": null,
+                    "day_due": 1
+                  }
+                ],
+                "remaining_items": [
+                  {
+                    "id": 129,
+                    "title": "Submit HR and Tax Documents",
+                    "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 130,
+                    "title": "Set Up Company Email and Slack",
+                    "description": "Configure 2FA security authentication and join essential team channels.",
+                    "department": null,
+                    "day_due": 2
+                  },
+                  {
+                    "id": 131,
+                    "title": "Backend Technical Setup",
+                    "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                    "department": "Backend",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 132,
+                    "title": "AI Model Sandbox Setup",
+                    "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                    "department": "AI",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 133,
+                    "title": "Meet Team Lead and Buddy",
+                    "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                    "department": null,
+                    "day_due": 3
+                  },
+                  {
+                    "id": 134,
+                    "title": "Review Production Architecture",
+                    "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                    "department": "Backend",
+                    "day_due": 4
+                  }
+                ]
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 1 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You still need to complete the following tasks:\n\n1. Submit HR and Tax Documents\n2. Set Up Company Email and Slack\n3. Backend Technical Setup\n4. AI Model Sandbox Setup\n5. Meet Team Lead and Buddy\n6. Review Production Architecture"
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "user_id": "demo-user-rep-2",
+      "latencies": [
+        19380.46,
+        8372.32,
+        11667.66
+      ],
+      "llm_calls": [
+        2,
+        2,
+        2
+      ],
+      "fast_path_count": 0,
+      "write_confirm_count": 1,
+      "total_writes": 1,
+      "count_correct": true,
+      "initial_total": 7,
+      "day1_remaining": 7,
+      "day3_remaining": 6,
+      "step_results": [
+        {
+          "day": 1,
+          "query": "Help me complete onboarding",
+          "latency_ms": 19380.46,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Generate a plan to assist the user in completing their onboarding process",
+            "steps": [
+              {
+                "tool": "company_knowledge",
+                "input": "onboarding checklist items",
+                "operation": null,
+                "args": null
+              },
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "get_progress",
+                "args": {}
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "company_knowledge",
+              "success": true,
+              "source": "sqlite",
+              "data": [
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 128,
+                  "title": "Complete Security Training",
+                  "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                  "department": null,
+                  "day_due": 1
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 129,
+                  "title": "Submit HR and Tax Documents",
+                  "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                  "department": null,
+                  "day_due": 1
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 130,
+                  "title": "Set Up Company Email and Slack",
+                  "description": "Configure 2FA security authentication and join essential team channels.",
+                  "department": null,
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 131,
+                  "title": "Backend Technical Setup",
+                  "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                  "department": "Backend",
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 132,
+                  "title": "AI Model Sandbox Setup",
+                  "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                  "department": "AI",
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 133,
+                  "title": "Meet Team Lead and Buddy",
+                  "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                  "department": null,
+                  "day_due": 3
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 134,
+                  "title": "Review Production Architecture",
+                  "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                  "department": "Backend",
+                  "day_due": 4
+                }
+              ],
+              "error": null
+            },
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "user_id": "demo-user-rep-2",
+                "role": null,
+                "department": null,
+                "onboarding_status": "not_started",
+                "total_items": 7,
+                "completed_count": 0,
+                "remaining_count": 7,
+                "progress_percent": 0.0,
+                "completed_items": [],
+                "remaining_items": [
+                  {
+                    "id": 128,
+                    "title": "Complete Security Training",
+                    "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 129,
+                    "title": "Submit HR and Tax Documents",
+                    "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 130,
+                    "title": "Set Up Company Email and Slack",
+                    "description": "Configure 2FA security authentication and join essential team channels.",
+                    "department": null,
+                    "day_due": 2
+                  },
+                  {
+                    "id": 131,
+                    "title": "Backend Technical Setup",
+                    "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                    "department": "Backend",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 132,
+                    "title": "AI Model Sandbox Setup",
+                    "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                    "department": "AI",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 133,
+                    "title": "Meet Team Lead and Buddy",
+                    "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                    "department": null,
+                    "day_due": 3
+                  },
+                  {
+                    "id": 134,
+                    "title": "Review Production Architecture",
+                    "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                    "department": "Backend",
+                    "day_due": 4
+                  }
+                ]
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": false,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 2 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": false,
+                "detail": "Potentially ungrounded numbers found in answer: ['6']"
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": false,
+          "memory_writes": null,
+          "answer": "You have 7 items to complete for onboarding. You have not started any of them. Here are the remaining items:\n\n1. Complete Security Training\n2. Submit HR and Tax Documents\n3. Set Up Company Email and Slack\n4. Backend Technical Setup\n5. AI Model Sandbox Setup\n6. Meet Team Lead and Buddy\n7. Review Production Architecture"
+        },
+        {
+          "day": 2,
+          "query": "I completed security training",
+          "latency_ms": 8372.32,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Mark the completion of the security training checklist item",
+            "steps": [
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "mark_item_complete",
+                "args": {
+                  "item_id": 128
+                }
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "success": true,
+                "operation": "mark_item_complete",
+                "user_id": "demo-user-rep-2",
+                "item_id": 128,
+                "item_title": "Complete Security Training",
+                "write_confirmed": true
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 1 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "write_confirmed",
+                "passed": true,
+                "detail": "Memory write 'mark_item_complete' confirmed via database read-back."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": [
+            {
+              "operation": "mark_item_complete",
+              "item_or_field": "Complete Security Training",
+              "confirmed": true
+            }
+          ],
+          "answer": "Complete Security Training has been marked as completed."
+        },
+        {
+          "day": 3,
+          "query": "What do I still need to do?",
+          "latency_ms": 11667.66,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Determine the remaining onboarding tasks for the user",
+            "steps": [
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "get_progress",
+                "args": {}
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "user_id": "demo-user-rep-2",
+                "role": null,
+                "department": null,
+                "onboarding_status": "in_progress",
+                "total_items": 7,
+                "completed_count": 1,
+                "remaining_count": 6,
+                "progress_percent": 14.3,
+                "completed_items": [
+                  {
+                    "id": 128,
+                    "title": "Complete Security Training",
+                    "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                    "department": null,
+                    "day_due": 1
+                  }
+                ],
+                "remaining_items": [
+                  {
+                    "id": 129,
+                    "title": "Submit HR and Tax Documents",
+                    "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 130,
+                    "title": "Set Up Company Email and Slack",
+                    "description": "Configure 2FA security authentication and join essential team channels.",
+                    "department": null,
+                    "day_due": 2
+                  },
+                  {
+                    "id": 131,
+                    "title": "Backend Technical Setup",
+                    "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                    "department": "Backend",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 132,
+                    "title": "AI Model Sandbox Setup",
+                    "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                    "department": "AI",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 133,
+                    "title": "Meet Team Lead and Buddy",
+                    "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                    "department": null,
+                    "day_due": 3
+                  },
+                  {
+                    "id": 134,
+                    "title": "Review Production Architecture",
+                    "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                    "department": "Backend",
+                    "day_due": 4
+                  }
+                ]
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 1 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You still need to complete the following tasks:\n\n1. Submit HR and Tax Documents\n2. Set Up Company Email and Slack\n3. Backend Technical Setup\n4. AI Model Sandbox Setup\n5. Meet Team Lead and Buddy\n6. Review Production Architecture"
+        }
+      ]
+    },
+    {
+      "repetition": 3,
+      "user_id": "demo-user-rep-3",
+      "latencies": [
+        23986.41,
+        9984.77,
+        12762.32
+      ],
+      "llm_calls": [
+        2,
+        2,
+        2
+      ],
+      "fast_path_count": 0,
+      "write_confirm_count": 1,
+      "total_writes": 1,
+      "count_correct": true,
+      "initial_total": 7,
+      "day1_remaining": 7,
+      "day3_remaining": 6,
+      "step_results": [
+        {
+          "day": 1,
+          "query": "Help me complete onboarding",
+          "latency_ms": 23986.41,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Generate a plan to assist the user in completing their onboarding process",
+            "steps": [
+              {
+                "tool": "company_knowledge",
+                "input": "onboarding checklist items",
+                "operation": null,
+                "args": null
+              },
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "get_progress",
+                "args": {}
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "company_knowledge",
+              "success": true,
+              "source": "sqlite",
+              "data": [
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 128,
+                  "title": "Complete Security Training",
+                  "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                  "department": null,
+                  "day_due": 1
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 129,
+                  "title": "Submit HR and Tax Documents",
+                  "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                  "department": null,
+                  "day_due": 1
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 130,
+                  "title": "Set Up Company Email and Slack",
+                  "description": "Configure 2FA security authentication and join essential team channels.",
+                  "department": null,
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 131,
+                  "title": "Backend Technical Setup",
+                  "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                  "department": "Backend",
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 132,
+                  "title": "AI Model Sandbox Setup",
+                  "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                  "department": "AI",
+                  "day_due": 2
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 133,
+                  "title": "Meet Team Lead and Buddy",
+                  "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                  "department": null,
+                  "day_due": 3
+                },
+                {
+                  "source": "sqlite",
+                  "type": "onboarding",
+                  "source_type": "onboarding",
+                  "id": 134,
+                  "title": "Review Production Architecture",
+                  "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                  "department": "Backend",
+                  "day_due": 4
+                }
+              ],
+              "error": null
+            },
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "user_id": "demo-user-rep-3",
+                "role": null,
+                "department": null,
+                "onboarding_status": "not_started",
+                "total_items": 7,
+                "completed_count": 0,
+                "remaining_count": 7,
+                "progress_percent": 0.0,
+                "completed_items": [],
+                "remaining_items": [
+                  {
+                    "id": 128,
+                    "title": "Complete Security Training",
+                    "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 129,
+                    "title": "Submit HR and Tax Documents",
+                    "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 130,
+                    "title": "Set Up Company Email and Slack",
+                    "description": "Configure 2FA security authentication and join essential team channels.",
+                    "department": null,
+                    "day_due": 2
+                  },
+                  {
+                    "id": 131,
+                    "title": "Backend Technical Setup",
+                    "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                    "department": "Backend",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 132,
+                    "title": "AI Model Sandbox Setup",
+                    "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                    "department": "AI",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 133,
+                    "title": "Meet Team Lead and Buddy",
+                    "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                    "department": null,
+                    "day_due": 3
+                  },
+                  {
+                    "id": 134,
+                    "title": "Review Production Architecture",
+                    "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                    "department": "Backend",
+                    "day_due": 4
+                  }
+                ]
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 2 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You have 7 items to complete for onboarding. You have not started any of them. The first item you should complete is \"Complete Security Training\"."
+        },
+        {
+          "day": 2,
+          "query": "I completed security training",
+          "latency_ms": 9984.77,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Mark the completion of the security training checklist item",
+            "steps": [
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "mark_item_complete",
+                "args": {
+                  "item_id": 128
+                }
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "success": true,
+                "operation": "mark_item_complete",
+                "user_id": "demo-user-rep-3",
+                "item_id": 128,
+                "item_title": "Complete Security Training",
+                "write_confirmed": true
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 1 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "write_confirmed",
+                "passed": true,
+                "detail": "Memory write 'mark_item_complete' confirmed via database read-back."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": [
+            {
+              "operation": "mark_item_complete",
+              "item_or_field": "Complete Security Training",
+              "confirmed": true
+            }
+          ],
+          "answer": "Complete Security Training has been marked as completed."
+        },
+        {
+          "day": 3,
+          "query": "What do I still need to do?",
+          "latency_ms": 12762.32,
+          "llm_calls": 2,
+          "plan_valid": true,
+          "op_matched": true,
+          "plan": {
+            "goal": "Determine the remaining onboarding tasks for the user",
+            "steps": [
+              {
+                "tool": "memory",
+                "input": null,
+                "operation": "get_progress",
+                "args": {}
+              }
+            ]
+          },
+          "tool_results": [
+            {
+              "tool": "memory",
+              "success": true,
+              "source": "sqlite",
+              "data": {
+                "user_id": "demo-user-rep-3",
+                "role": null,
+                "department": null,
+                "onboarding_status": "in_progress",
+                "total_items": 7,
+                "completed_count": 1,
+                "remaining_count": 6,
+                "progress_percent": 14.3,
+                "completed_items": [
+                  {
+                    "id": 128,
+                    "title": "Complete Security Training",
+                    "description": "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.",
+                    "department": null,
+                    "day_due": 1
+                  }
+                ],
+                "remaining_items": [
+                  {
+                    "id": 129,
+                    "title": "Submit HR and Tax Documents",
+                    "description": "Upload identity proof, tax withholding forms, and direct deposit banking details.",
+                    "department": null,
+                    "day_due": 1
+                  },
+                  {
+                    "id": 130,
+                    "title": "Set Up Company Email and Slack",
+                    "description": "Configure 2FA security authentication and join essential team channels.",
+                    "department": null,
+                    "day_due": 2
+                  },
+                  {
+                    "id": 131,
+                    "title": "Backend Technical Setup",
+                    "description": "Clone repositories, configure Python virtualenv, and test database connectivity.",
+                    "department": "Backend",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 132,
+                    "title": "AI Model Sandbox Setup",
+                    "description": "Verify Ollama installation, local model weights, and prompt evaluation tooling.",
+                    "department": "AI",
+                    "day_due": 2
+                  },
+                  {
+                    "id": 133,
+                    "title": "Meet Team Lead and Buddy",
+                    "description": "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.",
+                    "department": null,
+                    "day_due": 3
+                  },
+                  {
+                    "id": 134,
+                    "title": "Review Production Architecture",
+                    "description": "Read system architecture blueprints, security policies, and deployment runbooks.",
+                    "department": "Backend",
+                    "day_due": 4
+                  }
+                ]
+              },
+              "error": null
+            }
+          ],
+          "verification": {
+            "passed": true,
+            "checks": [
+              {
+                "name": "all_steps_executed",
+                "passed": true,
+                "detail": "All 1 planned steps executed successfully."
+              },
+              {
+                "name": "evidence_fact_grounding",
+                "passed": true,
+                "detail": "All numbers in answer appear in verified evidence."
+              },
+              {
+                "name": "security_no_internal_leak",
+                "passed": true,
+                "detail": "No internal SQL table names or database syntax leaked in answer."
+              }
+            ],
+            "unresolved": []
+          },
+          "verification_passed": true,
+          "memory_writes": null,
+          "answer": "You still need to complete the following tasks:\n\n1. Submit HR and Tax Documents\n2. Set Up Company Email and Slack\n3. Backend Technical Setup\n4. AI Model Sandbox Setup\n5. Meet Team Lead and Buddy\n6. Review Production Architecture"
+        }
+      ]
+    }
+  ]
+}
