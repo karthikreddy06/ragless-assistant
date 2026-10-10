@@ -55,7 +55,9 @@ class AgentPlanner:
             "  Parameter: 'input' (concise natural-language sub-question or topic).\n"
             "- 'memory': Persistent structured user profile and onboarding progress tracker.\n"
             "  Parameter: 'operation' (one of: 'get_profile', 'get_progress', 'set_profile', 'mark_item_complete', 'set_onboarding_status')\n"
-            "  Parameter: 'args' (structured object for operation parameters, e.g. {'item_id': 1} or {'department': 'Backend'}).\n\n"
+            "  Parameter: 'args' (structured object for operation parameters, e.g. {'item_id': 1} or {'department': 'Backend'}).\n"
+            "- 'web_research': Searches external public web for general technology, industry benchmarks, or outside technical documentation.\n"
+            "  Parameter: 'args': {'query': '<concise search query derived from user question>', 'max_results': 3}.\n\n"
             f"{catalog_section}"
             "When to use Memory operations:\n"
             "- 'get_progress': User asks what onboarding tasks are remaining, left to do, or asks for help completing onboarding.\n"
@@ -63,8 +65,11 @@ class AgentPlanner:
             "- 'set_profile': User explicitly specifies their role or department (args: {'role': '...', 'department': '...'}).\n"
             "- 'mark_item_complete': User explicitly states they completed or finished a checklist item (args: {'item_id': <integer ID from catalog>}).\n"
             "- 'set_onboarding_status': User explicitly requests changing their status (args: {'status': 'not_started'|'in_progress'|'completed'}).\n\n"
+            "When to use Web Research vs Company Knowledge:\n"
+            "- Use 'web_research' ONLY for external, industry, general technical documentation, or public knowledge (e.g. 'What are NVIDIA Nemotron deployment requirements?').\n"
+            "- NEVER use 'web_research' for internal company policies, company departments, leave days, or onboarding. Internal company questions (e.g. 'Who is the head of Engineering?', 'our leave policy') MUST route to 'company_knowledge' or 'memory', NEVER 'web_research'.\n\n"
             "STRICT RULES:\n"
-            "1. ONLY use 'company_knowledge' or 'memory'. Never invent tools (e.g. 'execute_sql', 'create_task', 'run_shell' are forbidden).\n"
+            "1. ONLY use 'company_knowledge', 'memory', or 'web_research'. Never invent tools (e.g. 'execute_sql', 'create_task', 'run_shell' are forbidden).\n"
             "2. NEVER write SQL queries, table names, or code in any parameter.\n"
             "3. NEVER specify 'user_id'. user_id is injected exclusively by server context and is strictly forbidden in plan steps.\n"
             "4. READ-ONLY INTENT SAFETY: Only use write operations ('set_profile', 'mark_item_complete', 'set_onboarding_status') when the user request explicitly instructs a change. If the user asks an informational question (e.g. 'what is security training?'), use 'company_knowledge' and do NOT write to memory.\n"
@@ -74,7 +79,7 @@ class AgentPlanner:
             '  "goal": "Brief description of the objective",\n'
             '  "steps": [\n'
             '    {"tool": "company_knowledge", "input": "natural language sub-question"},\n'
-            '    {"tool": "memory", "operation": "get_progress", "args": {}}\n'
+            '    {"tool": "web_research", "args": {"query": "external search query", "max_results": 3}}\n'
             "  ]\n"
             "}"
         )

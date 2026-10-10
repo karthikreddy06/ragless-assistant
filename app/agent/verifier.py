@@ -135,6 +135,87 @@ class Verifier:
             "Warning: Internal database table name or SQL syntax detected in answer.",
         ))
 
+        # 7. Check: Web research citations and claim grounding
+        has_web_step = any(tr.tool == "web_research" for tr in tool_results)
+        if has_web_step:
+            web_results = [tr for tr in tool_results if tr.tool == "web_research"]
+            successful_web_data = [tr.data for tr in web_results if tr.success and tr.data]
+
+            if successful_web_data:
+                # Check web_sources_cited: answer or sources must list URLs/titles
+                cited_markers = ["http://", "https://", "source:", "sources:", "[source", "www."]
+                has_citation = any(m in ans_lower for m in cited_markers)
+                if not has_citation:
+                    for d in successful_web_data:
+                        if isinstance(d, list):
+                            for item in d:
+                                if isinstance(item, dict):
+                                    t = item.get("title", "").lower()
+                                    if t and len(t) > 5 and t in ans_lower:
+                                        has_citation = True
+                                        break
+                checks.append(CheckItem(
+                    name="web_sources_cited",
+                    passed=has_citation,
+                    detail="Web research sources and URLs cited in grounded response."
+                    if has_citation else
+                    "Warning: External web sources or URLs were not explicitly cited in answer.",
+                ))
+                if not has_citation:
+                    unresolved.append("External web research sources were not explicitly cited.")
+
+                # Check web_claims_grounded: numbers and version strings in answer must appear in snippets or evidence
+                clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
+                list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
+                list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
+
+                numbers_and_versions_ans = set(re.findall(r"\b\d+(?:\.\d+)*\b", clean_ans)) - list_markers
+
+                web_snippets_text = " ".join(
+                    str(it.get("snippet", "")) + " " + str(it.get("title", ""))
+                    for d in successful_web_data if isinstance(d, list)
+                    for it in d if isinstance(it, dict)
+                )
+                evidence_numbers = {f for f in extracted_facts}
+                question_numbers = set(re.findall(r"\b\d+(?:\.\d+)*\b", question))
+                allowed_claims = evidence_numbers.union(question_numbers)
+
+                unsupported_claims = set()
+                for claim in numbers_and_versions_ans:
+                    if claim not in allowed_claims and claim not in web_snippets_text:
+                        unsupported_claims.add(claim)
+
+                claims_grounded = len(unsupported_claims) == 0
+                checks.append(CheckItem(
+                    name="web_claims_grounded",
+                    passed=claims_grounded,
+                    detail="All numbers and version strings in web-assisted answer are grounded in retrieved snippets."
+                    if claims_grounded else
+                    f"Ungrounded claims or version strings found in answer: {sorted(unsupported_claims)}",
+                ))
+                if not claims_grounded:
+                    unresolved.append(f"Answer contains ungrounded web claims: {sorted(unsupported_claims)}")
+            else:
+                external_refusal_markers = [
+                    "could not find", "not found", "unavailable", "cannot verify", "could not verify",
+                    "unable to verify", "no information", "not available"
+                ]
+                acknowledged = any(m in ans_lower for m in external_refusal_markers)
+                checks.append(CheckItem(
+                    name="web_sources_cited",
+                    passed=acknowledged,
+                    detail="Correctly acknowledged that external web information could not be verified."
+                    if acknowledged else
+                    "Failed: Web search failed but answer did not acknowledge lack of external verification.",
+                ))
+                checks.append(CheckItem(
+                    name="web_claims_grounded",
+                    passed=acknowledged,
+                    detail="No hallucinated external claims when web search returned no data."
+                    if acknowledged else
+                    "Failed: Answer did not state external verification was unavailable.",
+                ))
+
         # Overall verification outcome
         overall_passed = all(c.passed for c in checks)
 

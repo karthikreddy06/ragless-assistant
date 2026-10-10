@@ -8,7 +8,7 @@ from app.models import FORBIDDEN_SQL_PATTERNS
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_TOOLS: Set[str] = {"company_knowledge", "memory"}
+ALLOWED_TOOLS: Set[str] = {"company_knowledge", "memory", "web_research"}
 MAX_PLAN_STEPS: int = 8
 
 # Extra malicious injection patterns (SQL injection, shell execution, prompt overrides)
@@ -24,21 +24,135 @@ EXTENDED_FORBIDDEN_PATTERNS = FORBIDDEN_SQL_PATTERNS + [
     r"\bdisregard\s+(?:all\s+|any\s+)?(?:previous\s+|prior\s+)?instructions\b",
 ]
 
+EMAIL_REGEX = re.compile(r"\b[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\b")
+PHONE_REGEX = re.compile(r"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
+KEY_PATTERN_REGEX = re.compile(
+    r"\b(?:tvly-[a-zA-Z0-9_-]{10,}|sk-[a-zA-Z0-9_-]{10,}|api[_-]?key[_-]?[a-zA-Z0-9_-]{8,}|bearer\s+[a-zA-Z0-9_-]{10,})\b",
+    re.IGNORECASE,
+)
+
+INTERNAL_DB_TERMS = [
+    r"\buser_profile\b",
+    r"\buser_completed_items\b",
+    r"\bonboarding_items\b",
+    r"\bleave_policy\b",
+    r"\bdepartments?\s+table\b",
+    r"\bsqlite_\w+\b",
+]
+
+COMPANY_SPECIFIC_TERMS = [
+    r"\bthis\s+company\b",
+    r"\bour\s+company\b",
+    r"\bour\s+(?:policy|leave|vacation|holiday|sick\s+leave|annual\s+leave)\b",
+    r"\bmy\s+onboarding\b",
+    r"\bonboarding\s+(?:checklist|item|items|status|progress|tasks?)\b",
+    r"\bhead\s+of\b",
+    r"\bdepartment\s+head\b",
+    r"\bwho\s+is\s+the\s+head\s+of\b",
+    r"\bcompany\s+location\b",
+    r"\bhow\s+many\s+employees\b",
+    r"\btotal\s+employees\b",
+]
+
 
 class PlanValidationError(ValueError):
     """Raised when an unvalidated agent plan violates security or schema constraints."""
     pass
 
 
-def validate_plan(raw_plan: Any, max_steps: int = MAX_PLAN_STEPS) -> AgentPlan:
+def is_company_specific_question(question: str) -> bool:
+    """Determines if a question refers strictly to internal company specifics."""
+    if not question:
+        return False
+    q_lower = question.lower()
+    for pat in COMPANY_SPECIFIC_TERMS:
+        if re.search(pat, q_lower):
+            return True
+    try:
+        from app.database import get_current_company_name
+        cname = get_current_company_name().lower()
+        if cname and re.search(r"\b" + re.escape(cname) + r"\b", q_lower):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def validate_outbound_web_query(
+    query: str,
+    user_id: Optional[str] = None,
+    user_question: Optional[str] = None,
+) -> None:
+    """
+    Strict outbound guard for web_research tool:
+    - Must not contain user_id, emails, phone numbers, API keys, or SQL text.
+    - Must not contain internal database table names or memory structures.
+    - Must derive from the user's question (if user_question is provided).
+    """
+    if not query or not query.strip():
+        raise PlanValidationError("Outbound guard: web_research query cannot be empty.")
+    q_lower = query.strip().lower()
+
+    # 1. user_id leakage prevention
+    if user_id:
+        clean_uid = user_id.strip().lower()
+        if clean_uid and re.search(r"\b" + re.escape(clean_uid) + r"\b", q_lower):
+            raise PlanValidationError(f"Outbound guard: web_research query must not contain user_id '{user_id}'.")
+
+    # 2. Email address leakage
+    if EMAIL_REGEX.search(query):
+        raise PlanValidationError("Outbound guard: web_research query must not contain email addresses.")
+
+    # 3. Phone number leakage
+    if PHONE_REGEX.search(query):
+        raise PlanValidationError("Outbound guard: web_research query must not contain phone numbers.")
+
+    # 4. Sensitive API key or token leakage
+    if KEY_PATTERN_REGEX.search(query):
+        raise PlanValidationError("Outbound guard: web_research query must not contain API keys or tokens.")
+
+    # 5. SQL injection / query syntax
+    for pat in EXTENDED_FORBIDDEN_PATTERNS:
+        if re.search(pat, q_lower):
+            raise PlanValidationError(f"Outbound guard: web_research query contains forbidden syntax matching '{pat}'.")
+
+    # 6. Internal database structure leakage
+    for pat in INTERNAL_DB_TERMS:
+        if re.search(pat, q_lower):
+            raise PlanValidationError(f"Outbound guard: web_research query contains internal database reference '{pat}'.")
+
+    # 7. Query must derive from user question (topic keyword overlap)
+    if user_question:
+        q_words = set(re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", q_lower))
+        stop_words = {
+            "what", "when", "where", "which", "who", "whom", "whose", "why", "how",
+            "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+            "do", "does", "did", "can", "could", "should", "would", "will", "shall",
+            "the", "and", "for", "with", "about", "from", "into", "through", "during",
+            "before", "after", "above", "below", "to", "of", "in", "on", "at", "by",
+            "this", "that", "these", "those", "current", "latest", "requirements", "search"
+        }
+        q_topics = q_words - stop_words
+        u_words = set(re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", user_question.lower())) - stop_words
+        if q_topics and u_words and not (q_topics & u_words):
+            raise PlanValidationError("Outbound guard: web_research query must derive from the user question.")
+
+
+def validate_plan(
+    raw_plan: Any,
+    max_steps: int = MAX_PLAN_STEPS,
+    user_id: Optional[str] = None,
+    user_question: Optional[str] = None,
+) -> AgentPlan:
     """
     Strict security boundary validating untrusted LLM-generated plans:
     1. Enforces schema with extra='forbid'.
-    2. Enforces ALLOWED_TOOLS allowlist ({"company_knowledge", "memory"}).
+    2. Enforces ALLOWED_TOOLS allowlist ({"company_knowledge", "memory", "web_research"}).
     3. Enforces step count limits (1 <= steps <= max_steps).
     4. Enforces length bounds on goal and step inputs.
     5. Rejects any SQL syntax, injection fragments, and unsafe delimiters.
     6. Strictly forbids LLM specifying user_id in any step or argument.
+    7. Enforces outbound query guard and routing guard on web_research.
     """
     if not isinstance(raw_plan, dict):
         raise PlanValidationError(
@@ -62,7 +176,21 @@ def validate_plan(raw_plan: Any, max_steps: int = MAX_PLAN_STEPS) -> AgentPlan:
             f"Plan exceeds maximum allowed steps ({len(plan.steps)} > {max_steps})."
         )
 
-    # 3. Tool allowlist and security inspection per step
+    # 3. Routing Guard: company-specific questions
+    if user_question and is_company_specific_question(user_question):
+        # Company-specific questions may NOT be planned as web_research-only
+        if all(step.tool.strip().lower() == "web_research" for step in plan.steps):
+            raise PlanValidationError(
+                "Routing guard: company-specific questions cannot be planned as web_research-only."
+            )
+        # Questions asking for internal head/leadership/onboarding/leave cannot use web_research
+        if re.search(r"\b(?:head\s+of|leave\s+policy|onboarding)\b", user_question.lower()):
+            if any(step.tool.strip().lower() == "web_research" for step in plan.steps):
+                raise PlanValidationError(
+                    "Routing guard: internal company questions cannot use web_research."
+                )
+
+    # 4. Tool allowlist and security inspection per step
     for idx, step in enumerate(plan.steps, start=1):
         clean_tool = step.tool.strip().lower()
         if clean_tool not in ALLOWED_TOOLS:
@@ -82,10 +210,8 @@ def validate_plan(raw_plan: Any, max_steps: int = MAX_PLAN_STEPS) -> AgentPlan:
                     )
         elif clean_tool == "memory":
             args = step.args or {}
-            # Reject user_id in args
             if "user_id" in args:
                 raise PlanValidationError(f"Step {idx} attempts to set 'user_id'. user_id cannot be specified by the planner.")
-            # Scan all string values in args for forbidden patterns
             def scan_for_sql(val: Any):
                 if isinstance(val, str):
                     v_lower = val.lower()
@@ -103,5 +229,10 @@ def validate_plan(raw_plan: Any, max_steps: int = MAX_PLAN_STEPS) -> AgentPlan:
                         scan_for_sql(item)
 
             scan_for_sql(args)
+
+        elif clean_tool == "web_research":
+            args = step.args or {}
+            query = args.get("query") or step.input or ""
+            validate_outbound_web_query(query, user_id=user_id, user_question=user_question)
 
     return plan

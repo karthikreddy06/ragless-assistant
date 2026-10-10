@@ -40,8 +40,15 @@ class GetProgressArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class WebResearchStepArgs(BaseModel):
+    """Schema for web_research tool arguments with strict bounds and extra='forbid'."""
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(..., min_length=3, max_length=200, description="Web search query string")
+    max_results: int = Field(default=3, ge=1, le=5, description="Maximum number of results to fetch (1-5)")
+
+
 class PlanStep(BaseModel):
-    """Single step in an agent plan supporting company_knowledge or memory."""
+    """Single step in an agent plan supporting company_knowledge, memory, or web_research."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -49,7 +56,7 @@ class PlanStep(BaseModel):
         ...,
         min_length=1,
         max_length=50,
-        description="Name of the tool to invoke ('company_knowledge' or 'memory')",
+        description="Name of the tool to invoke ('company_knowledge', 'memory', or 'web_research')",
     )
     input: Optional[str] = Field(
         default=None,
@@ -63,7 +70,7 @@ class PlanStep(BaseModel):
     )
     args: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="Structured arguments for memory operation (extra='forbid', user_id forbidden)",
+        description="Structured arguments for tool operation (extra='forbid', user_id forbidden)",
     )
 
     @model_validator(mode="after")
@@ -94,6 +101,14 @@ class PlanStep(BaseModel):
                 GetProfileArgs.model_validate(args_dict)
             elif op == "get_progress":
                 GetProgressArgs.model_validate(args_dict)
+        elif t == "web_research":
+            args_dict = self.args or {}
+            if not args_dict and self.input:
+                args_dict = {"query": self.input, "max_results": 3}
+            if not args_dict:
+                raise ValueError("Step for tool 'web_research' must specify 'args' with 'query' and optional 'max_results'.")
+            validated_args = WebResearchStepArgs.model_validate(args_dict)
+            self.args = validated_args.model_dump()
         return self
 
 
@@ -212,3 +227,8 @@ class AgentResponse(BaseModel):
     memory_writes: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Confirmed memory write operations executed"
     )
+    web_used: Optional[bool] = Field(default=None, description="Whether web research tool was executed")
+    sources: Optional[List[Dict[str, str]]] = Field(
+        default=None, description="Sources cited from external web research"
+    )
+    web_calls_count: Optional[int] = Field(default=None, description="Count of web research calls executed")
