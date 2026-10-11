@@ -279,6 +279,31 @@ class TestTaskSecurityAndIntent(unittest.TestCase):
         all_tasks = self.task_store.list_tasks("ro-user")
         self.assertEqual(all_tasks["count"], 0)
 
+    def test_near_miss_onboarding_task_phrasings_do_not_write(self):
+        """Near-miss questions like 'Do I need to create tasks for onboarding?' or 'What are onboarding tasks?' must NOT write."""
+        near_misses = [
+            "Do I need to create tasks for onboarding?",
+            "What are onboarding tasks?",
+            "Should I create tasks for onboarding?",
+            "Can you explain onboarding tasks?",
+        ]
+        step_onboarding = PlanStep(tool="tasks", operation="create_tasks_from_onboarding", args={})
+        for q in near_misses:
+            self.assertFalse(
+                validate_onboarding_tasks_intent(q),
+                f"validate_onboarding_tasks_intent should return False for '{q}'",
+            )
+            res = self.executor.execute(step_onboarding, user_id="near-miss-user", question=q)
+            self.assertFalse(res.success, f"Expected execute to fail for near-miss query '{q}'")
+            self.assertIn("only permitted when user text explicitly requests", res.error)
+
+        # Confirm legitimate command passes intent validator and execution
+        legit_query = "Create tasks for my first-week onboarding"
+        self.assertTrue(validate_onboarding_tasks_intent(legit_query))
+        res_legit = self.executor.execute(step_onboarding, user_id="near-miss-user", question=legit_query)
+        self.assertTrue(res_legit.success)
+        self.assertTrue(res_legit.data["write_confirmed"])
+
     def test_title_not_in_user_text_rejected(self):
         """create_task title must appear verbatim (case-insensitive) in the user text."""
         step = PlanStep(tool="tasks", operation="create_task", args={"title": "Clean the kitchen"})

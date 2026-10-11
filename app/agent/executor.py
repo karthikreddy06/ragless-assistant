@@ -19,7 +19,7 @@ from app.agent.tasks import (
     validate_create_task_intent,
     validate_onboarding_tasks_intent,
 )
-from app.agent.web_search import WebSearchClient, get_web_search_client
+from app.agent.web_search import TavilyClient, WebSearchClient, get_web_search_client
 from app.query_engine import process_query
 
 logger = logging.getLogger(__name__)
@@ -65,13 +65,21 @@ def execute_web_research(
     """
     Executes a web search query with per-request call limits.
     Extracts ONLY result titles, snippets, and URLs. Never crashes on missing key.
+    Source label is 'tavily' only when a real TavilyClient is active; 'mock' for fake/offline clients.
     """
+    search_client = client or get_web_search_client()
+    is_real_tavily = (
+        isinstance(search_client, TavilyClient)
+        and search_client.is_available()
+    )
+    src_label = "tavily" if is_real_tavily else "mock"
+
     if call_count >= max_calls:
         logger.warning("Per-request web search limit (%d) exceeded.", max_calls)
         return ToolResult(
             tool="web_research",
             success=False,
-            source="tavily",
+            source=src_label,
             data=None,
             error=f"Per-request web search call limit of {max_calls} exceeded.",
         )
@@ -82,13 +90,12 @@ def execute_web_research(
         return ToolResult(
             tool="web_research",
             success=False,
-            source="tavily",
+            source=src_label,
             data=None,
             error="web_research requires non-empty query.",
         )
 
     max_results = int(args.get("max_results", 3))
-    search_client = client or get_web_search_client()
 
     try:
         res = search_client.search(query=query, max_results=max_results)
@@ -96,7 +103,7 @@ def execute_web_research(
             return ToolResult(
                 tool="web_research",
                 success=True,
-                source="tavily",
+                source=src_label,
                 data=res.get("results"),
                 error=None,
             )
@@ -104,7 +111,7 @@ def execute_web_research(
             return ToolResult(
                 tool="web_research",
                 success=False,
-                source="tavily",
+                source=src_label,
                 data=None,
                 error=res.get("error", "web research unavailable"),
             )
@@ -113,7 +120,7 @@ def execute_web_research(
         return ToolResult(
             tool="web_research",
             success=False,
-            source="tavily",
+            source=src_label,
             data=None,
             error=f"Web search execution error: {str(e)}",
         )

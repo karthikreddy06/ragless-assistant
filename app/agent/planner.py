@@ -86,6 +86,14 @@ class AgentPlanner:
             '      {"tool": "web_research", "args": {"query": "UK statutory minimum annual leave entitlement", "max_results": 1}}\n'
             '    ]\n'
             "  }\n\n"
+            "  Example Task Creation Question: \"Create tasks for my onboarding\"\n"
+            "  Example Plan (notice tool is 'tasks' with 'operation'):\n"
+            "  {\n"
+            '    "goal": "Create onboarding tasks for user",\n'
+            '    "steps": [\n'
+            '      {"tool": "tasks", "operation": "create_tasks_from_onboarding", "args": {}}\n'
+            '    ]\n'
+            "  }\n\n"
             "STRICT RULES:\n"
             "1. ONLY use 'company_knowledge', 'memory', 'tasks', or 'web_research'. Never invent tools (e.g. 'execute_sql', 'run_shell', 'delete_task' are forbidden).\n"
             "2. NEVER write SQL queries, table names, or code in any parameter.\n"

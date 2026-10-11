@@ -461,6 +461,33 @@ class TestDerivedNumbersVerification(unittest.TestCase):
         self.assertFalse(check.passed)
         self.assertIn("4", check.detail)
 
+    def test_derived_number_operands_must_appear_in_answer(self):
+        """A hallucinated 'AI has 200 employees' (where 80 and 120 are in evidence but NOT in answer) must FAIL."""
+        plan = AgentPlan(
+            goal="Check AI employees",
+            steps=[PlanStep(tool="company_knowledge", input="AI headcount")]
+        )
+        tool_results = [
+            ToolResult(
+                tool="company_knowledge",
+                success=True,
+                source="sqlite",
+                data=[{"name": "AI", "employees": 80}, {"name": "Backend", "employees": 120}]
+            ),
+        ]
+        # 80 and 120 are in evidence, but the answer only claims 200 without citing 80 and 120
+        hallucinated_answer = "AI has 200 employees."
+        res = self.verifier.verify(
+            question="How many employees are in AI?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=hallucinated_answer,
+        )
+        self.assertFalse(res.passed)
+        check = next(c for c in res.checks if c.name == "evidence_fact_grounding")
+        self.assertFalse(check.passed)
+        self.assertIn("200", check.detail)
+
 
 class TestAgentEndpoint(unittest.TestCase):
     """Integration tests for the /agent/ask HTTP endpoint using in-memory TestClient."""

@@ -113,6 +113,14 @@ class Verifier:
             unsupported_numbers = []
             accepted_derived: Dict[str, str] = {}
 
+            # Extract numeric values from answer for operand presence verification
+            answer_numeric_values: Set[float] = set()
+            for n in numbers_in_answer:
+                try:
+                    answer_numeric_values.add(float(n))
+                except ValueError:
+                    pass
+
             for num_str in set(numbers_in_answer):
                 try:
                     val = float(num_str)
@@ -124,8 +132,10 @@ class Verifier:
                 if val in evidence_numeric_values or val in question_numeric_values:
                     continue
 
-                # 2. Derivable from two numbers that BOTH appear in evidence
-                derivation = self.find_derived_number_explanation(val, evidence_numeric_values)
+                # 2. Derivable from two numbers that BOTH appear in evidence AND in the answer text
+                derivation = self.find_derived_number_explanation(
+                    val, evidence_numeric_values, answer_numbers=answer_numeric_values
+                )
                 if derivation:
                     accepted_derived[num_str] = derivation
                 else:
@@ -320,10 +330,14 @@ class Verifier:
         return False, "External web research sources or URLs were not explicitly cited."
 
     @staticmethod
-    def find_derived_number_explanation(val: float, evidence_numbers: Set[float]) -> Optional[str]:
+    def find_derived_number_explanation(
+        val: float,
+        evidence_numbers: Set[float],
+        answer_numbers: Optional[Set[float]] = None,
+    ) -> Optional[str]:
         """
         Determines whether a numeric value equals a difference, absolute difference, sum,
-        or percentage of two numbers that BOTH appear in the evidence.
+        or percentage of two numbers that BOTH appear in the evidence AND in the answer text.
         Returns a human-readable explanation (e.g. '4 = 28 - 24') or None.
         """
         def _fmt(n: float) -> str:
@@ -333,9 +347,18 @@ class Verifier:
         if len(nums) < 2:
             return None
 
+        # Both operands must appear in the answer text (as well as in evidence)
+        if answer_numbers is not None:
+            candidate_nums = [n for n in nums if n in answer_numbers]
+        else:
+            candidate_nums = nums
+
+        if len(candidate_nums) < 2:
+            return None
+
         # 1. Percentage check (a / b * 100 where a != b, b > 0)
-        for a in nums:
-            for b in nums:
+        for a in candidate_nums:
+            for b in candidate_nums:
                 if a == b or b <= 0:
                     continue
                 pct = (a / b) * 100.0
@@ -343,20 +366,20 @@ class Verifier:
                     return f"{_fmt(val)}% = ({_fmt(a)} / {_fmt(b)}) * 100"
 
         # 2. Difference check (a - b where a > b)
-        for a in nums:
-            for b in nums:
+        for a in candidate_nums:
+            for b in candidate_nums:
                 if a > b and abs(val - (a - b)) < 1e-4:
                     return f"{_fmt(val)} = {_fmt(a)} - {_fmt(b)}"
 
         # 3. Sum check (a + b where a != b)
-        for a in nums:
-            for b in nums:
+        for a in candidate_nums:
+            for b in candidate_nums:
                 if a != b and abs(val - (a + b)) < 1e-4:
                     return f"{_fmt(val)} = {_fmt(a)} + {_fmt(b)}"
 
         # 4. Absolute difference fallback |a - b| (where a != b)
-        for a in nums:
-            for b in nums:
+        for a in candidate_nums:
+            for b in candidate_nums:
                 if a != b and abs(val - abs(a - b)) < 1e-4 and abs(a - b) > 0:
                     return f"{_fmt(val)} = |{_fmt(a)} - {_fmt(b)}|"
 

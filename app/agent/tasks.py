@@ -89,21 +89,33 @@ def validate_task_title(title: str) -> str:
     return clean
 
 
+READ_ONLY_TASK_INQUIRY_PATTERNS = [
+    re.compile(r"\b(?:what\s+(?:is|are)|explain|describe|tell\s+me\s+about)\s+(?:an?\s+)?onboarding\s+tasks?\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(?:is|are)\s+(?:a\s+)?tasks?\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+tasks?\s+do\s+i\s+have\b", re.IGNORECASE),
+    re.compile(r"^(?:do\s+i\s+(?:need|have)\s+to|should\s+i|must\s+i|am\s+i\s+(?:required|supposed)\s+to|how\s+do\s+i|how\s+to|is\s+it\s+necessary\s+to)\b", re.IGNORECASE),
+    re.compile(r"\b(?:do\s+i\s+need\s+to|should\s+i|do\s+i\s+have\s+to)\s+(?:create|add|set\s*up)\b", re.IGNORECASE),
+]
+
+
 def validate_onboarding_tasks_intent(question: Optional[str]) -> bool:
     """
     Validates explicit intent to create onboarding tasks.
     Must clearly ask to create/add/set up onboarding tasks.
-    Read-only questions like 'what tasks do I have?' or 'what is a task?' return False.
+    Read-only inquiries, definitions, or questions about necessity (e.g. 'Do I need to create tasks for onboarding?',
+    'What are onboarding tasks?') return False.
     """
     if not question:
         return False
     q = question.strip()
     q_lower = q.lower()
 
-    # Reject strict read-only inquiries
-    if re.search(r"\bwhat\s+is\s+a\s+task\b", q_lower) or re.search(r"\bwhat\s+tasks?\s+do\s+i\s+have\b", q_lower):
-        return False
-    if q_lower.startswith(("what is a task", "what are tasks", "what tasks do i have")):
+    # Reject informational inquiries, definitions, and questions of obligation/necessity
+    for pat in READ_ONLY_TASK_INQUIRY_PATTERNS:
+        if pat.search(q):
+            return False
+
+    if q_lower.startswith(("what is a task", "what are tasks", "what tasks do i have", "what are onboarding tasks")):
         return False
 
     return bool(ONBOARDING_TASKS_CREATE_INTENT_PATTERN.search(q))
