@@ -151,20 +151,40 @@ class Verifier:
                 detail=detail,
             ))
 
-        # 5. Check: Write confirmation for memory write operations
+        # 5. Check: Write confirmation for memory and task write operations
         for tr in tool_results:
-            if tr.tool == "memory" and isinstance(tr.data, dict) and "write_confirmed" in tr.data:
+            if tr.tool in ("memory", "tasks") and isinstance(tr.data, dict) and "write_confirmed" in tr.data:
                 confirmed = bool(tr.data.get("write_confirmed"))
                 op_name = tr.data.get("operation", "write")
+                tool_label = "Memory" if tr.tool == "memory" else "Task"
                 checks.append(CheckItem(
                     name="write_confirmed",
                     passed=confirmed,
-                    detail=f"Memory write '{op_name}' confirmed via database read-back."
+                    detail=f"{tool_label} write '{op_name}' confirmed via database read-back."
                     if confirmed else
-                    f"Memory write '{op_name}' read-back confirmation failed.",
+                    f"{tool_label} write '{op_name}' read-back confirmation failed.",
                 ))
                 if not confirmed:
                     unresolved.append(f"Write operation '{op_name}' failed read-back verification.")
+
+        # Check: The answer must never claim a task was created or completed unless confirmed
+        task_claim_patterns = [
+            r"\b(?:created|added)\s+(?:the\s+)?(?:onboarding\s+)?tasks?\b",
+            r"\b(?:completed|finished)\s+(?:the\s+)?task\b",
+            r"\bmarked\s+task\s+#?\d+\s+as\s+(?:done|complete)\b",
+        ]
+        has_task_claim = any(re.search(pat, ans_lower) for pat in task_claim_patterns)
+        task_write_confirmed = any(
+            tr.tool == "tasks" and isinstance(tr.data, dict) and tr.data.get("write_confirmed")
+            for tr in tool_results
+        )
+        if has_task_claim and not task_write_confirmed:
+            checks.append(CheckItem(
+                name="write_confirmed",
+                passed=False,
+                detail="Answer claims a task was created or completed, but no task write was confirmed in database.",
+            ))
+            unresolved.append("Unconfirmed task write claim in answer.")
 
         # 6. Check: No SQL or internal exposure in final answer
         sql_leaks = [

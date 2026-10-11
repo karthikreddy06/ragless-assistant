@@ -10,12 +10,22 @@ from app.agent.memory import (
     validate_profile_intent,
 )
 from app.agent.schemas import PlanStep, ToolResult
+from app.agent.tasks import (
+    TaskError,
+    TaskLimitError,
+    TaskStore,
+    get_task_store,
+    validate_complete_task_intent,
+    validate_create_task_intent,
+    validate_onboarding_tasks_intent,
+)
 from app.agent.web_search import WebSearchClient, get_web_search_client
 from app.query_engine import process_query
 
 logger = logging.getLogger(__name__)
 
 WEB_MAX_CALLS_PER_REQUEST = 2
+MAX_TASK_WRITES_PER_REQUEST = 10
 
 
 def execute_company_knowledge(query_input: str) -> ToolResult:
@@ -242,6 +252,158 @@ def execute_memory(
         )
 
 
+def execute_tasks(
+    step: PlanStep,
+    user_id: str,
+    task_store: Optional[TaskStore] = None,
+    question: Optional[str] = None,
+    run_context: Optional["RunContext"] = None,
+) -> ToolResult:
+    """
+    Executes a validated tasks tool operation with parameterized SQLite calls,
+    explicit-intent verification, per-request write limits, and immediate read-back verification.
+    """
+    store = task_store or get_task_store()
+    op = (step.operation or "").strip().lower()
+    args = step.args or {}
+    ctx = run_context or RunContext()
+
+    # Per-request write limit check for write operations
+    if op in ("create_tasks_from_onboarding", "create_task", "complete_task"):
+        if ctx.task_writes_count >= MAX_TASK_WRITES_PER_REQUEST:
+            return ToolResult(
+                tool="tasks",
+                success=False,
+                source="sqlite",
+                data=None,
+                error=f"Per-request task write limit of {MAX_TASK_WRITES_PER_REQUEST} writes exceeded.",
+            )
+
+    try:
+        if op == "list_tasks":
+            status_filter = args.get("status")
+            res = store.list_tasks(user_id=user_id, status=status_filter)
+            return ToolResult(
+                tool="tasks",
+                success=True,
+                source="sqlite",
+                data=res,
+                error=None,
+            )
+
+        elif op == "create_tasks_from_onboarding":
+            if not validate_onboarding_tasks_intent(question):
+                logger.warning(
+                    "Rejected create_tasks_from_onboarding for question '%s': lacks explicit creation intent",
+                    question,
+                )
+                return ToolResult(
+                    tool="tasks",
+                    success=False,
+                    source="sqlite",
+                    data=None,
+                    error="create_tasks_from_onboarding is only permitted when user text explicitly requests creating or setting up onboarding tasks.",
+                )
+            res = store.create_tasks_from_onboarding(user_id=user_id)
+            writes = res.get("created_count", 0)
+            ctx.task_writes_count += max(1, writes)
+            return ToolResult(
+                tool="tasks",
+                success=True,
+                source="sqlite",
+                data=res,
+                error=None,
+            )
+
+        elif op == "create_task":
+            title = str(args.get("title", "")).strip()
+            if not validate_create_task_intent(question, title):
+                logger.warning(
+                    "Rejected create_task with title '%s' for question '%s': lacks explicit intent or title match",
+                    title, question,
+                )
+                return ToolResult(
+                    tool="tasks",
+                    success=False,
+                    source="sqlite",
+                    data=None,
+                    error=f"create_task is only permitted when user explicitly requests adding a task and title '{title}' appears verbatim in user text.",
+                )
+            res = store.create_task(user_id=user_id, title=title)
+            ctx.task_writes_count += 1
+            return ToolResult(
+                tool="tasks",
+                success=True,
+                source="sqlite",
+                data=res,
+                error=None,
+            )
+
+        elif op == "complete_task":
+            task_id = int(args.get("task_id", 0))
+            task_title = None
+            try:
+                conn = store.get_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT title FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id))
+                r = cur.fetchone()
+                if r:
+                    task_title = r[0]
+                conn.close()
+            except Exception:
+                pass
+
+            if not validate_complete_task_intent(question, task_id, task_title):
+                logger.warning(
+                    "Rejected complete_task #%d for question '%s': lacks explicit completion intent matching task",
+                    task_id, question,
+                )
+                return ToolResult(
+                    tool="tasks",
+                    success=False,
+                    source="sqlite",
+                    data=None,
+                    error=f"complete_task is only permitted when user explicitly requests completing task #{task_id}.",
+                )
+            res = store.complete_task(user_id=user_id, task_id=task_id)
+            ctx.task_writes_count += 1
+            return ToolResult(
+                tool="tasks",
+                success=True,
+                source="sqlite",
+                data=res,
+                error=None,
+            )
+
+        else:
+            return ToolResult(
+                tool="tasks",
+                success=False,
+                source="sqlite",
+                data=None,
+                error=f"Unsupported tasks operation '{op}'.",
+            )
+
+    except (TaskLimitError, TaskError) as e:
+        logger.warning("Task execution error: %s", e)
+        return ToolResult(
+            tool="tasks",
+            success=False,
+            source="sqlite",
+            data=None,
+            error=str(e),
+        )
+    except Exception as e:
+        logger.exception("Unexpected error executing tasks operation '%s': %s", op, e)
+        return ToolResult(
+            tool="tasks",
+            success=False,
+            source="sqlite",
+            data=None,
+            error=f"Task execution error: {str(e)}",
+        )
+
+
 from contextvars import ContextVar
 
 current_run_context: ContextVar[Optional["RunContext"]] = ContextVar("current_run_context", default=None)
@@ -251,7 +413,7 @@ current_active_client: ContextVar[Optional[Any]] = ContextVar("current_active_cl
 class RunContext:
     """
     Per-run execution context ensuring request isolation.
-    Tracks taint state, web call counts, LLM call counts, and per-call latencies per request.
+    Tracks taint state, web call counts, LLM call counts, task writes count, and per-call latencies per request.
     """
 
     def __init__(self, run_id: Optional[str] = None):
@@ -260,6 +422,7 @@ class RunContext:
         self.web_calls_count: int = 0
         self.llm_calls_count: int = 0
         self.llm_latency_ms: list[float] = []
+        self.task_writes_count: int = 0
 
     def record_llm_call(self, latency_ms: float = 0.0) -> None:
         self.llm_calls_count += 1
@@ -272,12 +435,14 @@ class ToolExecutor:
     def __init__(
         self,
         memory_store: Optional[MemoryStore] = None,
+        task_store: Optional[TaskStore] = None,
         web_client: Optional[WebSearchClient] = None,
         web_search_client: Optional[WebSearchClient] = None,
         max_web_calls: int = WEB_MAX_CALLS_PER_REQUEST,
         db_path: Any = None,
     ):
         self._memory_store = memory_store or get_memory_store()
+        self._task_store = task_store or get_task_store()
         self._web_client = web_client or web_search_client
         self.max_web_calls = max_web_calls
         self._default_context = RunContext()
@@ -308,20 +473,34 @@ class ToolExecutor:
         tool_name = step.tool.strip().lower()
 
         # TAINT RULE ENFORCEMENT:
-        # Once web content has entered a run, memory write operations are strictly prohibited!
-        if ctx.is_tainted and tool_name == "memory":
-            op = (step.operation or "").strip().lower()
-            if op in ("set_profile", "mark_item_complete", "set_onboarding_status"):
-                logger.warning(
-                    "Rejected memory write operation '%s': execution run is tainted by web research", op
-                )
-                return ToolResult(
-                    tool="memory",
-                    success=False,
-                    source="sqlite",
-                    data=None,
-                    error="Security violation: memory write prohibited after web content has entered the execution run (taint rule).",
-                )
+        # Once web content has entered a run, memory and task write operations are strictly prohibited!
+        if ctx.is_tainted:
+            if tool_name == "memory":
+                op = (step.operation or "").strip().lower()
+                if op in ("set_profile", "mark_item_complete", "set_onboarding_status"):
+                    logger.warning(
+                        "Rejected memory write operation '%s': execution run is tainted by web research", op
+                    )
+                    return ToolResult(
+                        tool="memory",
+                        success=False,
+                        source="sqlite",
+                        data=None,
+                        error="Security violation: memory write prohibited after web content has entered the execution run (taint rule).",
+                    )
+            elif tool_name == "tasks":
+                op = (step.operation or "").strip().lower()
+                if op in ("create_tasks_from_onboarding", "create_task", "complete_task"):
+                    logger.warning(
+                        "Rejected task write operation '%s': execution run is tainted by web research", op
+                    )
+                    return ToolResult(
+                        tool="tasks",
+                        success=False,
+                        source="sqlite",
+                        data=None,
+                        error="Security violation: task write prohibited after web content has entered the execution run (taint rule).",
+                    )
 
         if tool_name == "company_knowledge":
             if not step.input:
@@ -336,6 +515,15 @@ class ToolExecutor:
 
         elif tool_name == "memory":
             return execute_memory(step, user_id, store=self._memory_store, question=effective_question)
+
+        elif tool_name == "tasks":
+            return execute_tasks(
+                step,
+                user_id=user_id,
+                task_store=self._task_store,
+                question=effective_question,
+                run_context=ctx,
+            )
 
         elif tool_name == "web_research":
             res = execute_web_research(

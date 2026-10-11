@@ -8,7 +8,7 @@ from app.models import FORBIDDEN_SQL_PATTERNS
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_TOOLS: Set[str] = {"company_knowledge", "memory", "web_research"}
+ALLOWED_TOOLS: Set[str] = {"company_knowledge", "memory", "web_research", "tasks"}
 MAX_PLAN_STEPS: int = 8
 
 # Extra malicious injection patterns (SQL injection, shell execution, prompt overrides)
@@ -238,7 +238,7 @@ def validate_plan(
                     raise PlanValidationError(
                         f"Step {idx} input contains forbidden syntax or injection pattern matching '{pat}'."
                     )
-        elif clean_tool == "memory":
+        elif clean_tool in ("memory", "tasks"):
             args = step.args or {}
             if "user_id" in args:
                 raise PlanValidationError(f"Step {idx} attempts to set 'user_id'. user_id cannot be specified by the planner.")

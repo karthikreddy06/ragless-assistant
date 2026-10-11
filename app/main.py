@@ -360,3 +360,44 @@ async def get_user_memory(user_id: str):
         "progress": progress,
         "note": "Demo identifier only. Real multi-tenant authentication is out of scope.",
     }
+
+
+@app.get(
+    "/tasks/{user_id}",
+    summary="Get User Tasks",
+    description=(
+        "Returns the list of tasks for a given user_id. "
+        "NOTE: user_id is a demonstration identifier and there is no real authentication. "
+        "Do not rely on this endpoint for secure multi-tenancy."
+    ),
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid user_id format"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+async def get_user_tasks(user_id: str, status: Optional[str] = None):
+    from fastapi import status as http_status
+    from app.agent.tasks import TaskError, get_task_store, validate_user_id
+    try:
+        clean_uid = validate_user_id(user_id)
+    except TaskError as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    store = get_task_store()
+    try:
+        res = store.list_tasks(clean_uid, status=status)
+        return {
+            "user_id": clean_uid,
+            "tasks": res["tasks"],
+            "count": res["count"],
+            "note": "user_id is a demo identifier; no real authentication.",
+        }
+    except Exception as e:
+        logger.exception("Error retrieving tasks for user '%s': %s", clean_uid, e)
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve tasks: {str(e)}",
+        )

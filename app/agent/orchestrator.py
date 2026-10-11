@@ -222,6 +222,8 @@ class AgentOrchestrator:
             all_evidence: List[Dict[str, Any]] = []
             memory_used = any(tr.tool == "memory" for tr in tool_results)
             memory_writes = []
+            tasks_used = any(tr.tool == "tasks" for tr in tool_results)
+            tasks_changed = []
             web_used = any(tr.tool == "web_research" for tr in tool_results)
             sources: List[Dict[str, str]] = []
 
@@ -232,6 +234,8 @@ class AgentOrchestrator:
                         "item_or_field": str(tr.data.get("item_title") or tr.data.get("item_id") or tr.data.get("status") or "profile"),
                         "confirmed": bool(tr.data.get("write_confirmed")),
                     })
+                elif tr.tool == "tasks" and isinstance(tr.data, dict) and "tasks_changed" in tr.data:
+                    tasks_changed.extend(tr.data.get("tasks_changed", []))
                 elif tr.tool == "web_research" and tr.success and tr.data:
                     items = tr.data if isinstance(tr.data, list) else [tr.data]
                     for item in items:
@@ -294,6 +298,8 @@ class AgentOrchestrator:
                 user_id=valid_uid,
                 memory_used=memory_used,
                 memory_writes=memory_writes if memory_writes else None,
+                tasks_used=tasks_used,
+                tasks_changed=tasks_changed if tasks_changed else None,
                 web_used=web_used,
                 sources=sources if sources else None,
                 web_calls_count=run_context.web_calls_count if web_used else 0,
@@ -390,6 +396,17 @@ Answer:"""
                 facts.append(f"{item.get('leave_type')}: {item.get('days')} days")
             elif item.get("total_items") is not None:
                 facts.append(f"Onboarding progress: {item.get('completed_count')}/{item.get('total_items')} items completed ({item.get('remaining_count')} remaining)")
+            elif item.get("operation") == "create_tasks_from_onboarding":
+                facts.append(f"Created {item.get('created_count', 0)} onboarding tasks ({item.get('total_onboarding_tasks', 0)} total)")
+            elif item.get("operation") == "create_task":
+                task_obj = item.get("task", {})
+                facts.append(f"Created task #{task_obj.get('id')}: {task_obj.get('title')}")
+            elif item.get("operation") == "complete_task":
+                task_obj = item.get("task", {})
+                facts.append(f"Completed task #{task_obj.get('id')}: {task_obj.get('title')}")
+            elif item.get("operation") == "list_tasks":
+                tasks_list = item.get("tasks", [])
+                facts.append(f"{len(tasks_list)} tasks: " + ", ".join(f"#{t.get('id')} {t.get('title')} [{t.get('status')}]" for t in tasks_list[:5]))
         joined = "; ".join(facts) if facts else "verified facts"
         res = f"Based on verified data: {joined}."
         if sources and not any(s["url"] in res for s in sources):

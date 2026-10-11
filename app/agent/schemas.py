@@ -40,6 +40,55 @@ class GetProgressArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+# ==========================================
+# Task Tool Operation Schemas
+# ==========================================
+
+ALLOWED_TASK_OPERATIONS = {
+    "create_tasks_from_onboarding",
+    "create_task",
+    "list_tasks",
+    "complete_task",
+}
+
+
+class CreateTasksFromOnboardingArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CreateTaskArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(..., min_length=1, max_length=150)
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("Task title cannot be empty.")
+        if len(s) > 150:
+            raise ValueError("Task title exceeds maximum length of 150 characters.")
+        import re
+        from app.models import FORBIDDEN_SQL_PATTERNS
+        if not re.match(r"^[a-zA-Z0-9\s.,_\-?!()'\":/]+$", s):
+            raise ValueError("Task title contains invalid characters.")
+        s_lower = s.lower()
+        for pat in FORBIDDEN_SQL_PATTERNS:
+            if re.search(pat, s_lower):
+                raise ValueError("Task title contains forbidden SQL pattern.")
+        return s
+
+
+class ListTasksArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Optional[Literal["open", "done"]] = None
+
+
+class CompleteTaskArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task_id: int = Field(..., ge=1)
+
+
 class WebResearchStepArgs(BaseModel):
     """Schema for web_research tool arguments with strict bounds and extra='forbid'."""
     model_config = ConfigDict(extra="forbid")
@@ -101,6 +150,26 @@ class PlanStep(BaseModel):
                 GetProfileArgs.model_validate(args_dict)
             elif op == "get_progress":
                 GetProgressArgs.model_validate(args_dict)
+        elif t == "tasks":
+            if not self.operation or not self.operation.strip():
+                raise ValueError("Step for tool 'tasks' must specify an 'operation'.")
+            op = self.operation.strip().lower()
+            if op not in ALLOWED_TASK_OPERATIONS:
+                raise ValueError(
+                    f"Disallowed task operation '{self.operation}'. Allowed: {sorted(ALLOWED_TASK_OPERATIONS)}"
+                )
+            args_dict = self.args or {}
+            if "user_id" in args_dict:
+                raise ValueError("Plan steps must not specify 'user_id'. user_id is server-injected.")
+
+            if op == "create_tasks_from_onboarding":
+                CreateTasksFromOnboardingArgs.model_validate(args_dict)
+            elif op == "create_task":
+                CreateTaskArgs.model_validate(args_dict)
+            elif op == "list_tasks":
+                ListTasksArgs.model_validate(args_dict)
+            elif op == "complete_task":
+                CompleteTaskArgs.model_validate(args_dict)
         elif t == "web_research":
             args_dict = self.args or {}
             if not args_dict and self.input:
@@ -229,6 +298,10 @@ class AgentResponse(BaseModel):
     memory_used: Optional[bool] = Field(default=None, description="Whether persistent memory tool was utilized")
     memory_writes: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Confirmed memory write operations executed"
+    )
+    tasks_used: Optional[bool] = Field(default=None, description="Whether tasks tool was executed")
+    tasks_changed: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Confirmed task write operations executed"
     )
     web_used: Optional[bool] = Field(default=None, description="Whether web research tool was executed")
     sources: Optional[List[Dict[str, str]]] = Field(

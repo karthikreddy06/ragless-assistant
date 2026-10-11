@@ -90,6 +90,30 @@ def initialize_database() -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            source TEXT NOT NULL CHECK(source IN ('onboarding', 'user')),
+            onboarding_item_id INTEGER NULL,
+            status TEXT NOT NULL CHECK(status IN ('open', 'done')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_user_onboarding
+        ON tasks(user_id, onboarding_item_id)
+        WHERE onboarding_item_id IS NOT NULL
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_user_status
+        ON tasks(user_id, status)
+    """)
+
     connection.commit()
     connection.close()
 

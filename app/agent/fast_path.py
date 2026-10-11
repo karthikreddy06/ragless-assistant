@@ -32,7 +32,38 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
 
     q_lower = question.strip().lower()
 
-    # 1. Onboarding progress queries
+    # 1. Tasks operations (clearest phrasings)
+    # (a) Complete task N
+    task_complete_match = re.search(
+        r"\b(?:complete|finish)\s+task\s+#?(\d+)\b|"
+        r"\bmark\s+task\s+#?(\d+)\s+as\s+(?:done|complete)\b",
+        q_lower,
+    )
+    if task_complete_match:
+        task_id = int(task_complete_match.group(1) or task_complete_match.group(2))
+        logger.info("Fast-path triggered: complete_task (id=%d) for '%s'", task_id, question)
+        return AgentPlan(
+            goal=f"Complete task #{task_id}",
+            steps=[PlanStep(tool="tasks", operation="complete_task", args={"task_id": task_id})],
+        )
+
+    # (b) Create tasks from onboarding
+    if re.search(r"\b(?:create|add|set\s*up)\s+tasks?\s+(?:for|from)\s+(?:my\s+)?(?:first-week\s+)?onboarding\b|\b(?:create|add|set\s*up)\s+(?:my\s+)?(?:first-week\s+)?onboarding\s+tasks?\b", q_lower):
+        logger.info("Fast-path triggered: create_tasks_from_onboarding for '%s'", question)
+        return AgentPlan(
+            goal="Create tasks from onboarding checklist items",
+            steps=[PlanStep(tool="tasks", operation="create_tasks_from_onboarding", args={})],
+        )
+
+    # (c) What tasks do I have
+    if re.search(r"\b(?:what\s+tasks?\s+do\s+i\s+have|show\s+(?:my\s+)?tasks?|list\s+(?:my\s+)?tasks?|view\s+(?:my\s+)?tasks?)\b", q_lower):
+        logger.info("Fast-path triggered: list_tasks for '%s'", question)
+        return AgentPlan(
+            goal="List user tasks",
+            steps=[PlanStep(tool="tasks", operation="list_tasks", args={})],
+        )
+
+    # 2. Onboarding progress queries
     progress_patterns = [
         r"\bwhat\s+(?:do\s+i\s+still\s+need\s+to\s+(?:do|complete)|is\s+left\s+to\s+do|items\s+are\s+remaining)\b",
         r"\bwhat\s+do\s+i\s+need\s+to\s+do\s+next\b",
@@ -50,9 +81,9 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
                 steps=[PlanStep(tool="memory", operation="get_progress", args={})],
             )
 
-    # 2. Mark item complete by ID or name
+    # 3. Mark item complete by ID or name
     # ID pattern: e.g. "mark item 1 complete", "mark item 1 as done", "completed item 2"
-    id_match = re.search(r"\b(?:mark|completed?|finished?)\s+(?:item|task)?\s*#?(\d+)(?:\s+(?:complete|done|as\s+done|as\s+complete))?\b", q_lower)
+    id_match = re.search(r"\b(?:mark|completed?|finished?)\s+item\s*#?(\d+)(?:\s+(?:complete|done|as\s+done|as\s+complete))?\b", q_lower)
     if id_match:
         item_id = int(id_match.group(1))
         logger.info("Fast-path triggered: mark_item_complete (id=%d) for '%s'", item_id, question)
