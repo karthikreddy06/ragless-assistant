@@ -4,7 +4,7 @@
 
 Phase 4 adds external web research capability to the RAGless Knowledge Assistant via the `web_research` tool. This allows the system to ground answers in external benchmarks, industry standards, and public documentation (e.g., statutory leave policies, technology release notes) while strictly preserving internal knowledge boundaries, user privacy, and persistent memory integrity.
 
-External web data is inherently untrusted. The integration implements defense-in-depth at the Python layer (validator, executor, and verifier) with zero dependence on LLM compliance for safety.
+External web data is inherently untrusted. The integration implements defense-in-depth at the Python layer (validator, executor, and verifier) alongside the LLM planner.
 
 ---
 
@@ -46,6 +46,7 @@ The tool is allowlisted in `ALLOWED_TOOLS = {"company_knowledge", "memory", "web
 - LRU-style cache with 300-second TTL and 100-entry max size cap.
 - Normalizes query strings (whitespace trimmed, lowercase).
 - Avoids redundant HTTP calls for identical queries across or within sessions.
+- **Process-Wide Cache**: The cache is process-wide in-memory, sharing cached query responses across all requests within the active process.
 
 ---
 
@@ -63,6 +64,7 @@ All outbound queries proposed by the planner are inspected prior to dispatch:
 ### 4.2 Routing Guard
 - Questions regarding internal company specifics (e.g., "Who is the head of Engineering?", "What is our annual leave policy?", onboarding tasks) cannot be routed as `web_research`-only and cannot execute `web_research`.
 - Prevents external search for questions that must be grounded solely in internal company knowledge.
+- **Routing Mechanics**: Routing relies on a combination of the LLM planner plus deterministic Python security guards (`is_company_specific_question`, `validate_outbound_web_query`, and plan validation). If the planner emits a disallowed tool choice or attempts external web search for an internal question, Python guards reject the plan.
 
 ### 4.3 Execution Run Taint Rule (Prompt Injection Defense)
 - **Rule**: Once untrusted web data has entered the execution run (any successful `web_research` tool call), the run is marked as `tainted`.
@@ -89,7 +91,7 @@ Zero-LLM deterministic Python assertions:
 ## 6. Verification Status & Live Key Disclaimer
 
 ### Safe Offline Test Suite (`tests/test_web_research.py`)
-- **Status**: **26 / 26 PASSED** (0 external network calls).
+- **Status**: **29 / 29 PASSED** (0 external network calls).
 - Covers:
   - Allowed tools validation and schema constraints (bounds, extra fields).
   - Outbound query guard rejections (user_id, emails, SQL text, API keys, internal table names).

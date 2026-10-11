@@ -215,14 +215,21 @@ class Verifier:
         answer: str,
         web_results: List[Dict[str, Any]],
     ) -> Tuple[bool, str]:
-        """Verifies that an answer cites external URLs or domains when web research was used."""
+        """
+        Verifies that an answer cites external URLs or domain names from the retrieved web results.
+        Cannot be satisfied by vague markers like 'Source:', 'sources:', or generic phrases.
+        """
+        if not web_results:
+            return False, "No external web results available to cite."
+
         ans_lower = answer.lower()
-        if any(m in ans_lower for m in ["http://", "https://", "source:", "sources:", "[source", "www."]):
-            return True, "Web research sources and URLs cited in grounded response."
 
         for item in web_results:
             if isinstance(item, dict):
-                url = str(item.get("url", "")).lower()
+                url = str(item.get("url", "")).strip().lower()
+                if url and url in ans_lower:
+                    return True, "Web research sources and URLs cited in grounded response."
+
                 domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url)
                 if domain_match:
                     domain = domain_match.group(1).lower()

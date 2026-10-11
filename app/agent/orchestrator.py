@@ -62,6 +62,7 @@ class AgentOrchestrator:
         """
         start_time = time.perf_counter()
         clean_q = question.strip()
+        self.executor.reset_run()
 
         try:
             valid_uid = validate_user_id(user_id)
@@ -214,13 +215,14 @@ class AgentOrchestrator:
                     "item_or_field": str(tr.data.get("item_title") or tr.data.get("item_id") or tr.data.get("status") or "profile"),
                     "confirmed": bool(tr.data.get("write_confirmed")),
                 })
-            elif tr.tool == "web_research" and isinstance(tr.data, list):
-                for item in tr.data:
+            elif tr.tool == "web_research" and tr.success and tr.data:
+                items = tr.data if isinstance(tr.data, list) else [tr.data]
+                for item in items:
                     if isinstance(item, dict) and item.get("url"):
-                        sources.append({
-                            "title": item.get("title", "Untitled"),
-                            "url": item.get("url", ""),
-                        })
+                        u = str(item["url"]).strip()
+                        t = str(item.get("title") or "Untitled").strip()
+                        if u and not any(s["url"] == u for s in sources):
+                            sources.append({"title": t, "url": u})
             if tr.data:
                 if isinstance(tr.data, list):
                     all_evidence.extend(tr.data)

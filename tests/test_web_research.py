@@ -89,7 +89,7 @@ def setup_test_db(db_path: Path):
     """)
     cursor.execute("INSERT INTO departments (name, employees) VALUES ('AI', 15), ('Backend', 25)")
     cursor.execute("INSERT INTO leave_policy (leave_type, days) VALUES ('annual', 25), ('sick', 10)")
-    cursor.execute("INSERT INTO onboarding_items (id, title, description, department, day_due) VALUES (1, 'security_training', 'Complete security compliance', 'All', 3)")
+    cursor.execute("INSERT INTO onboarding_items (id, title, description, department, day_due) VALUES (1, 'security_training', 'Complete security compliance', 'All', 3), (282, 'Complete Security Training', 'Complete security compliance', 'All', 3)")
     conn.commit()
     conn.close()
 
@@ -411,7 +411,29 @@ class TestWebResearchVerifierAndRedaction(unittest.TestCase):
         ans_no_source = "Python 3.12 was released in October 2023."
         passed3, reason3 = verifier.verify_web_sources_cited(ans_no_source, web_results)
         self.assertFalse(passed3)
-        self.assertIn("source", reason3.lower())
+        self.assertIn("not explicitly cited", reason3.lower())
+
+    def test_verifier_rejects_vague_markers_without_real_url_or_domain(self):
+        """Vague markers like 'Source:', 'sources:', or generic labels must be rejected."""
+        verifier = Verifier()
+        web_results = [
+            {"title": "Python 3.12", "url": "https://python.org/3.12", "snippet": "Released Oct 2023"}
+        ]
+        # Vague marker 1: 'Source: web research'
+        ans1 = "Python 3.12 was released in Oct 2023. Source: web research."
+        passed1, reason1 = verifier.verify_web_sources_cited(ans1, web_results)
+        self.assertFalse(passed1)
+        self.assertIn("not explicitly cited", reason1.lower())
+
+        # Vague marker 2: 'Sources indicate'
+        ans2 = "Sources indicate that Python 3.12 was released in Oct 2023."
+        passed2, reason2 = verifier.verify_web_sources_cited(ans2, web_results)
+        self.assertFalse(passed2)
+
+        # Vague marker 3: '[source]' without link
+        ans3 = "Python 3.12 was released in Oct 2023 [source]."
+        passed3, reason3 = verifier.verify_web_sources_cited(ans3, web_results)
+        self.assertFalse(passed3)
 
     def test_verifier_web_claims_grounded_check(self):
         verifier = Verifier()
@@ -577,6 +599,78 @@ class TestWebResearchOrchestratorEndToEnd(unittest.TestCase):
         self.assertEqual(completed_items, [])
         self.assertEqual(len(response.plan.steps), 1)
         self.assertEqual(response.plan.steps[0].tool, "web_research")
+
+    def test_taint_does_not_persist_across_requests(self):
+        """Request 1 uses web, Request 2 does a legitimate memory write on same orchestrator and must succeed."""
+        fake_web = FakeWebSearchClient(
+            canned_results=[
+                {
+                    "title": "Python Docs",
+                    "url": "https://python.org",
+                    "snippet": "Python release notes",
+                }
+            ]
+        )
+        plan1_json = """{
+            "goal": "Search python info",
+            "steps": [{"tool": "web_research", "args": {"query": "python docs", "max_results": 1}}]
+        }"""
+        llm = FakeLLMClient(
+            plan_json=plan1_json,
+            text_response="Python docs found at https://python.org",
+        )
+        executor = ToolExecutor(memory_store=self.memory_store, web_client=fake_web)
+        orchestrator = AgentOrchestrator(llm_client=llm, executor=executor)
+
+        # Request 1: uses web_research
+        resp1 = orchestrator.run("What is in Python docs?", user_id="user_reset_test")
+        self.assertTrue(resp1.web_used)
+
+        # Request 2 on SAME orchestrator instance: legitimate memory write
+        plan2_json = """{
+            "goal": "Mark security training complete",
+            "steps": [{"tool": "memory", "operation": "mark_item_complete", "args": {"item_id": 1}}]
+        }"""
+        llm.plan_json = plan2_json
+        llm.text_response = "You have completed security training."
+
+        resp2 = orchestrator.run("mark item 1 complete", user_id="user_reset_test")
+        # Legitimate write must succeed and not be blocked by taint from request 1
+        self.assertIsNotNone(resp2.memory_writes)
+        self.assertTrue(resp2.memory_writes[0]["confirmed"])
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT item_id FROM user_completed_items WHERE user_id = ?", ("user_reset_test",))
+        rows = cursor.fetchall()
+        conn.close()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["item_id"], 1)
+
+    def test_agent_response_sources_come_from_tool_results_independent_of_answer_text(self):
+        """AgentResponse.sources must come from tool results even if answer text does not repeat them."""
+        fake_web = FakeWebSearchClient(
+            canned_results=[
+                {"title": "Doc A", "url": "https://example.com/docA", "snippet": "Info A"},
+                {"title": "Doc B", "url": "https://example.com/docB", "snippet": "Info B"},
+            ]
+        )
+        plan_json = """{
+            "goal": "Search project documentation",
+            "steps": [{"tool": "web_research", "args": {"query": "project documentation guidelines", "max_results": 2}}]
+        }"""
+        # Answer text cites only one domain
+        llm = FakeLLMClient(
+            plan_json=plan_json,
+            text_response="Information found according to example.com.",
+        )
+        executor = ToolExecutor(memory_store=self.memory_store, web_client=fake_web)
+        orchestrator = AgentOrchestrator(llm_client=llm, executor=executor)
+
+        resp = orchestrator.run("Search project documentation guidelines", user_id="user_sources_test")
+        self.assertIsNotNone(resp.sources)
+        self.assertEqual(len(resp.sources), 2)
+        urls = {s["url"] for s in resp.sources}
+        self.assertEqual(urls, {"https://example.com/docA", "https://example.com/docB"})
 
 
 if __name__ == "__main__":

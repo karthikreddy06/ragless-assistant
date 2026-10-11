@@ -1,0 +1,234 @@
+{
+  "fast_path_true": {
+    "company": [
+      {
+        "run": 1,
+        "question": "Who is the head of Engineering?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "I could not find information about that in the company database. TechNova's knowledge base only contains company details (name, location, total employ"
+      },
+      {
+        "run": 2,
+        "question": "Who is the head of Engineering?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "I could not find information about that in the company database. TechNova's knowledge base only contains company details (name, location, total employ"
+      },
+      {
+        "run": 3,
+        "question": "Who is the head of Engineering?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "I could not find information about that in the company database. TechNova's knowledge base only contains company details (name, location, total employ"
+      }
+    ],
+    "external": [
+      {
+        "run": 1,
+        "question": "What are the current NVIDIA Nemotron deployment requirements?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "web_research"
+        ],
+        "web_called": true,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "NVIDIA Nemotron-3 models require 8x H100 SXM GPUs for FP8 inference and Triton Server 24.08. The UK Statutory Leave Guidelines are unrelated to NVIDIA"
+      },
+      {
+        "run": 2,
+        "question": "What are the current NVIDIA Nemotron deployment requirements?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "web_research"
+        ],
+        "web_called": true,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "NVIDIA Nemotron-3 models require 8x H100 SXM GPUs for FP8 inference and Triton Server 24.08. The UK Statutory Leave Guidelines are unrelated to NVIDIA"
+      },
+      {
+        "run": 3,
+        "question": "What are the current NVIDIA Nemotron deployment requirements?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "web_research"
+        ],
+        "web_called": true,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "NVIDIA Nemotron-3 models require 8x H100 SXM GPUs for FP8 inference and Triton Server 24.08. The UK Statutory Leave Guidelines are unrelated to NVIDIA"
+      }
+    ],
+    "mixed": [
+      {
+        "run": 1,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "Our annual leave policy provides 24 days of annual leave."
+      },
+      {
+        "run": 2,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "Our annual leave policy provides 24 days of annual leave. However, I cannot compare this to UK statutory minimum as the provided data does not include"
+      },
+      {
+        "run": 3,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "Our annual leave policy provides 24 days of annual leave. However, I cannot compare this to UK statutory minimum as the provided data does not contain"
+      }
+    ]
+  },
+  "fast_path_false": {
+    "company": [
+      {
+        "run": 1,
+        "question": "Who is the head of Engineering?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "I could not find information about that in the company database. TechNova's knowledge base only contains company details (name, location, total employ"
+      },
+      {
+        "run": 2,
+        "question": "Who is the head of Engineering?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "I could not find information about that in the company database. TechNova's knowledge base only contains company details (name, location, total employ"
+      },
+      {
+        "run": 3,
+        "question": "Who is the head of Engineering?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "I could not find information about that in the company database. TechNova's knowledge base only contains company details (name, location, total employ"
+      }
+    ],
+    "external": [
+      {
+        "run": 1,
+        "question": "What are the current NVIDIA Nemotron deployment requirements?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "web_research"
+        ],
+        "web_called": true,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "NVIDIA Nemotron-3 models require 8x H100 SXM GPUs for FP8 inference and Triton Server 24.08. The UK statutory leave guidelines are not related to NVID"
+      },
+      {
+        "run": 2,
+        "question": "What are the current NVIDIA Nemotron deployment requirements?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "web_research"
+        ],
+        "web_called": true,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "NVIDIA Nemotron-3 models require 8x H100 SXM GPUs for FP8 inference and Triton Server 24.08. The UK statutory leave guidelines are not related to NVID"
+      },
+      {
+        "run": 3,
+        "question": "What are the current NVIDIA Nemotron deployment requirements?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "web_research"
+        ],
+        "web_called": true,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "NVIDIA Nemotron-3 models require 8x H100 SXM GPUs for FP8 inference and Triton Server 24.08. The UK statutory leave guidelines are not related to NVID"
+      }
+    ],
+    "mixed": [
+      {
+        "run": 1,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "Our annual leave policy provides 24 days of annual leave."
+      },
+      {
+        "run": 2,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "Our annual leave policy provides 24 days of annual leave."
+      },
+      {
+        "run": 3,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge"
+        ],
+        "web_called": false,
+        "stopping_layer": "None (Executed)",
+        "verified": true,
+        "answer_preview": "Our annual leave policy provides 24 days of annual leave."
+      }
+    ]
+  }
+}
