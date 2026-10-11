@@ -337,9 +337,14 @@ curl -X GET http://127.0.0.1:8000/knowledge
 ### `POST /knowledge/import`
 Uploads and validates a JSON knowledge file, clears prior data, and atomically writes the new records into SQLite.
 
+**Authentication**:
+- If `ADMIN_TOKEN` environment variable is set, requests must supply the `X-Admin-Token` header matching the token.
+- If `ADMIN_TOKEN` is unset, the endpoint operates in local development mode without header requirements (a startup warning is logged).
+
 **Request**:
 ```bash
 curl -X POST http://127.0.0.1:8000/knowledge/import \
+  -H "X-Admin-Token: your_admin_token_here" \
   -F "file=@data/sample_knowledge.json"
 ```
 

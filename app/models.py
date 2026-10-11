@@ -206,6 +206,7 @@ class LeavePolicyKnowledgeModel(BaseModel):
 class OnboardingItemKnowledgeModel(BaseModel):
     """Validation schema for onboarding checklist items in knowledge imports."""
 
+    id: Optional[int] = Field(default=None, ge=1, description="Checklist item ID")
     title: str = Field(..., min_length=1, max_length=200, description="Checklist item title")
     description: str = Field(..., min_length=1, max_length=500, description="Checklist item description")
     department: Optional[str] = Field(default=None, max_length=100, description="Target department, or None for company-wide")

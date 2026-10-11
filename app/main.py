@@ -1,8 +1,10 @@
+import hmac
 import logging
+import os
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -42,6 +44,12 @@ logger = logging.getLogger("ragless-assistant")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for database initialization and startup checks."""
+    admin_token = os.getenv("ADMIN_TOKEN")
+    if not admin_token:
+        logger.warning(
+            "Security warning: ADMIN_TOKEN environment variable is unset. "
+            "/knowledge/import endpoint is accessible without authentication (local dev mode)."
+        )
     logger.info("Initializing and verifying SQLite database...")
     initialize_database()
     seed_database()
@@ -241,7 +249,19 @@ async def view_knowledge() -> KnowledgeViewResponse:
         500: {"model": ErrorResponse, "description": "Internal Ingestion Error"},
     },
 )
-async def import_knowledge(file: UploadFile = File(...)) -> ImportSummaryResponse:
+async def import_knowledge(
+    file: UploadFile = File(...),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+) -> ImportSummaryResponse:
+    admin_token = os.getenv("ADMIN_TOKEN")
+    if admin_token:
+        if not x_admin_token or not hmac.compare_digest(x_admin_token.strip(), admin_token.strip()):
+            logger.warning("Rejected unauthorized knowledge import attempt.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized: missing or invalid X-Admin-Token header.",
+            )
+
     if not file:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

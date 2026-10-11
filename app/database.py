@@ -1,14 +1,28 @@
+import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "data" / "knowledge.db"
+DEFAULT_DATABASE_PATH = Path(__file__).resolve().parent.parent / "data" / "knowledge.db"
+
+
+def get_database_path() -> Path:
+    """Return configured SQLite database path from DATABASE_PATH env var or default."""
+    env_path = os.getenv("DATABASE_PATH")
+    if env_path:
+        return Path(env_path)
+    return DEFAULT_DATABASE_PATH
+
+
+DATABASE_PATH = DEFAULT_DATABASE_PATH
 
 
 def get_connection() -> sqlite3.Connection:
     """Create and return a SQLite connection with Row factory enabled."""
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH)
+    db_path = get_database_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -81,78 +95,36 @@ def initialize_database() -> None:
 
 
 def seed_database() -> None:
-    """Seed the database with baseline company data if tables are empty."""
+    """
+    Seed the database idempotently with baseline company data from data/sample_knowledge.json.
+    data/sample_knowledge.json is the single source of truth for the demo (TechNova: Hyderabad,
+    AI 80, Backend 120, Data Science 70, leave 24/12/10, 7 onboarding items with fixed IDs 1-7).
+    Seeding is idempotent: multiple calls or server restarts never alter or increment IDs.
+    """
+    sample_file = Path(__file__).resolve().parent.parent / "data" / "sample_knowledge.json"
+    if not sample_file.exists():
+        return
+
+    with open(sample_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
     connection = get_connection()
-    cursor = connection.cursor()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT(*) FROM company_info")
+        company_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM onboarding_items")
+        onboarding_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM company_info")
-    company_count = cursor.fetchone()[0]
-
-    if company_count == 0:
-        company_data = [
-            ("company", "name", "ABC Technologies"),
-            ("company", "location", "Bangalore"),
-            ("company", "employees", "250"),
-        ]
-
-        cursor.executemany(
-            "INSERT INTO company_info (category, key, value) VALUES (?, ?, ?)",
-            company_data,
-        )
-
-    cursor.execute("SELECT COUNT(*) FROM departments")
-    department_count = cursor.fetchone()[0]
-
-    if department_count == 0:
-        departments = [
-            ("AI", 40),
-            ("Backend", 60),
-            ("Frontend", 35),
-            ("Data Science", 30),
-        ]
-
-        cursor.executemany(
-            "INSERT INTO departments (name, employees) VALUES (?, ?)",
-            departments,
-        )
-
-    cursor.execute("SELECT COUNT(*) FROM leave_policy")
-    leave_count = cursor.fetchone()[0]
-
-    if leave_count == 0:
-        leave_data = [
-            ("Annual Leave", 20),
-            ("Sick Leave", 10),
-            ("Casual Leave", 12),
-        ]
-
-        cursor.executemany(
-            "INSERT INTO leave_policy (leave_type, days) VALUES (?, ?)",
-            leave_data,
-        )
-
-    cursor.execute("SELECT COUNT(*) FROM onboarding_items")
-    onboarding_count = cursor.fetchone()[0]
-
-    if onboarding_count == 0:
-        onboarding_seed = [
-            ("Complete Security Training", "Complete mandatory cybersecurity, data privacy, and phishing compliance modules.", None, 1),
-            ("Submit HR and Tax Documents", "Upload identity proof, tax withholding forms, and direct deposit banking details.", None, 1),
-            ("Set Up Company Email and Slack", "Configure 2FA security authentication and join essential team channels.", None, 2),
-            ("Backend Technical Setup", "Clone repositories, configure Python virtualenv, and test database connectivity.", "Backend", 2),
-            ("AI Model Sandbox Setup", "Verify Ollama installation, local model weights, and prompt evaluation tooling.", "AI", 2),
-            ("Meet Team Lead and Buddy", "Schedule introductory 1-on-1 sessions with department manager and onboarding buddy.", None, 3),
-            ("Review Production Architecture", "Read system architecture blueprints, security policies, and deployment runbooks.", "Backend", 4),
-            ("First Sprint Planning", "Participate in sprint backlog grooming and assign first starter implementation task.", None, 5),
-        ]
-
-        cursor.executemany(
-            "INSERT INTO onboarding_items (title, description, department, day_due) VALUES (?, ?, ?, ?)",
-            onboarding_seed,
-        )
-
-    connection.commit()
-    connection.close()
+        if company_count == 0 or onboarding_count == 0:
+            clear_and_ingest_knowledge(
+                company=data["company"],
+                departments=data["departments"],
+                leave_policy=data["leave_policy"],
+                onboarding_items=data.get("onboarding_items"),
+            )
+    finally:
+        connection.close()
 
 
 def get_onboarding_items(department: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -465,18 +437,40 @@ def clear_and_ingest_knowledge(
 
             # 5. Insert onboarding_items if provided
             if onboarding_items:
-                item_data = [
-                    (
-                        str(item["title"]).strip(),
-                        str(item["description"]).strip(),
-                        str(item["department"]).strip() if item.get("department") else None,
-                        int(item["day_due"]),
+                try:
+                    cursor.execute("DELETE FROM sqlite_sequence WHERE name = 'onboarding_items'")
+                except Exception:
+                    pass
+
+                has_ids = any(item.get("id") is not None for item in onboarding_items)
+                if has_ids:
+                    item_data = [
+                        (
+                            int(item["id"]) if item.get("id") is not None else None,
+                            str(item["title"]).strip(),
+                            str(item["description"]).strip(),
+                            str(item["department"]).strip() if item.get("department") else None,
+                            int(item["day_due"]),
+                        )
+                        for item in onboarding_items
+                    ]
+                    cursor.executemany(
+                        "INSERT INTO onboarding_items (id, title, description, department, day_due) VALUES (?, ?, ?, ?, ?)",
+                        item_data,
                     )
-                    for item in onboarding_items
-                ]
-                cursor.executemany(
-                    "INSERT INTO onboarding_items (title, description, department, day_due) VALUES (?, ?, ?, ?)",
-                    item_data,
-                )
+                else:
+                    item_data = [
+                        (
+                            str(item["title"]).strip(),
+                            str(item["description"]).strip(),
+                            str(item["department"]).strip() if item.get("department") else None,
+                            int(item["day_due"]),
+                        )
+                        for item in onboarding_items
+                    ]
+                    cursor.executemany(
+                        "INSERT INTO onboarding_items (title, description, department, day_due) VALUES (?, ?, ?, ?)",
+                        item_data,
+                    )
     finally:
         connection.close()

@@ -1,8 +1,12 @@
 import json
+import os
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 import pytest
 import requests
+from fastapi.testclient import TestClient
 
 from app.database import (
     initialize_database,
@@ -13,6 +17,7 @@ from app.database import (
     get_leave_policy,
     get_full_knowledge,
     get_current_company_name,
+    get_onboarding_items,
 )
 from app.ingestion import (
     ingest_knowledge_from_content,
@@ -25,6 +30,7 @@ from app.llm import (
     _call_ollama_generate,
     check_ollama_health,
 )
+from app.main import app
 from app.query_engine import (
     execute_query_operation,
     execute_structured_retrieval,
@@ -32,14 +38,32 @@ from app.query_engine import (
     validate_and_refine_query_plan,
 )
 
+_BACKEND_TEMP_DIR = None
+_ORIG_DB_PATH = None
+
+
+def setUpModule():
+    global _BACKEND_TEMP_DIR, _ORIG_DB_PATH
+    _BACKEND_TEMP_DIR = tempfile.TemporaryDirectory()
+    temp_db = Path(_BACKEND_TEMP_DIR.name) / "test_knowledge.db"
+    _ORIG_DB_PATH = os.environ.get("DATABASE_PATH")
+    os.environ["DATABASE_PATH"] = str(temp_db)
+    initialize_database()
+    seed_database()
+
+
+def tearDownModule():
+    global _BACKEND_TEMP_DIR, _ORIG_DB_PATH
+    if _ORIG_DB_PATH is not None:
+        os.environ["DATABASE_PATH"] = _ORIG_DB_PATH
+    elif "DATABASE_PATH" in os.environ:
+        del os.environ["DATABASE_PATH"]
+    if _BACKEND_TEMP_DIR:
+        _BACKEND_TEMP_DIR.cleanup()
+
 
 class TestDatabaseLayer(unittest.TestCase):
     """Test SQLite database operations and safe parameterized queries."""
-
-    @classmethod
-    def setUpClass(cls):
-        initialize_database()
-        seed_database()
 
     def test_database_health(self):
         self.assertTrue(check_database_health())
@@ -59,6 +83,31 @@ class TestDatabaseLayer(unittest.TestCase):
     def test_leave_policy_query(self):
         rows = get_leave_policy()
         self.assertTrue(len(rows) > 0)
+
+    def test_seed_database_idempotent_twice_identical_ids(self):
+        """Part 0.2: Seeding must be idempotent; restarting server / re-seeding must not create new IDs."""
+        with tempfile.TemporaryDirectory() as td:
+            temp_db = Path(td) / "idempotent_test.db"
+            old_db = os.environ.get("DATABASE_PATH")
+            os.environ["DATABASE_PATH"] = str(temp_db)
+            try:
+                initialize_database()
+                seed_database()
+                items_first = get_onboarding_items()
+                ids_first = [it["id"] for it in items_first]
+                self.assertEqual(ids_first, [1, 2, 3, 4, 5, 6, 7])
+
+                # Seed a second time: must NOT re-insert or generate new auto-increment IDs
+                seed_database()
+                items_second = get_onboarding_items()
+                ids_second = [it["id"] for it in items_second]
+                self.assertEqual(ids_second, [1, 2, 3, 4, 5, 6, 7])
+                self.assertEqual(items_first, items_second)
+            finally:
+                if old_db is not None:
+                    os.environ["DATABASE_PATH"] = old_db
+                elif "DATABASE_PATH" in os.environ:
+                    del os.environ["DATABASE_PATH"]
 
 
 class TestModelValidation(unittest.TestCase):
@@ -309,7 +358,7 @@ class TestDynamicKnowledgeReplacementRegression(unittest.TestCase):
     Dedicated regression test verifying complete knowledge replacement:
     Company A (TechNova) -> Company B (NextGen AI).
     Confirms answers dynamically switch (AI: 80 -> 200, Leave: 24 -> 30)
-    and that no stale data remains in SQLite.
+    and that no stale data remains in SQLite. Runs in an isolated temp DB.
     """
 
     @classmethod
@@ -319,6 +368,19 @@ class TestDynamicKnowledgeReplacementRegression(unittest.TestCase):
     def setUp(self):
         if not self.health.get("available") or not self.health.get("model_installed"):
             self.skipTest("Ollama is not running or qwen2.5:3b is not installed.")
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_db = Path(self.temp_dir.name) / "dyn_replace.db"
+        self.old_db = os.environ.get("DATABASE_PATH")
+        os.environ["DATABASE_PATH"] = str(self.temp_db)
+        initialize_database()
+
+    def tearDown(self):
+        if hasattr(self, "old_db") and self.old_db is not None:
+            os.environ["DATABASE_PATH"] = self.old_db
+        elif "DATABASE_PATH" in os.environ:
+            del os.environ["DATABASE_PATH"]
+        if hasattr(self, "temp_dir"):
+            self.temp_dir.cleanup()
 
     def test_dynamic_replacement_cycle(self):
         # 1. Ingest Company A (TechNova)
@@ -368,14 +430,27 @@ class TestDynamicKnowledgeReplacementRegression(unittest.TestCase):
 class TestPhase5MultiQueryReasoning(unittest.TestCase):
     """
     Phase 5 comprehensive multi-query, multi-table, security, and grounding test suite.
-    Evaluates multi-table reasoning on NextGen AI corporate knowledge.
+    Evaluates multi-table reasoning on TechNova corporate knowledge in an isolated temp DB.
     """
 
     @classmethod
     def setUpClass(cls):
         cls.health = check_ollama_health()
-        with open("data/test_company.json", "r") as f:
-            ingest_knowledge_from_content(f.read())
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        cls.temp_db = Path(cls.temp_dir.name) / "technova_multi.db"
+        cls.old_db = os.environ.get("DATABASE_PATH")
+        os.environ["DATABASE_PATH"] = str(cls.temp_db)
+        initialize_database()
+        seed_database()
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "old_db") and cls.old_db is not None:
+            os.environ["DATABASE_PATH"] = cls.old_db
+        elif "DATABASE_PATH" in os.environ:
+            del os.environ["DATABASE_PATH"]
+        if hasattr(cls, "temp_dir"):
+            cls.temp_dir.cleanup()
 
     def setUp(self):
         if not self.health.get("available") or not self.health.get("model_installed"):
@@ -384,16 +459,16 @@ class TestPhase5MultiQueryReasoning(unittest.TestCase):
     def test_multi_table_company_and_department(self):
         """Test 2: Company name + Department headcount."""
         res = process_query("What is the company name and how many people work in AI?")
-        self.assertIn("NextGen AI", res["answer"])
-        self.assertIn("200", res["answer"])
+        self.assertIn("TechNova", res["answer"])
+        self.assertIn("80", res["answer"])
         self.assertEqual(res["source"], "sqlite")
         self.assertGreaterEqual(res["queries_executed"], 2)
 
     def test_multi_table_department_and_leave(self):
         """Test 1: Department headcount + Leave policy."""
         res = process_query("How many employees are in AI and how many annual leave days are available?")
-        self.assertIn("200", res["answer"])
-        self.assertIn("30", res["answer"])
+        self.assertIn("80", res["answer"])
+        self.assertIn("24", res["answer"])
         self.assertEqual(res["source"], "sqlite")
         self.assertEqual(res["intent"], "multi_query")
         self.assertEqual(res["queries_executed"], 2)
@@ -401,60 +476,60 @@ class TestPhase5MultiQueryReasoning(unittest.TestCase):
     def test_multi_table_company_location_and_employees(self):
         """Test 3: Company location + Company employee count."""
         res = process_query("Where is the company located and how many employees does it have?")
-        self.assertIn("Chennai", res["answer"])
-        self.assertIn("1000", res["answer"])
+        self.assertIn("Hyderabad", res["answer"])
+        self.assertIn("500", res["answer"])
         self.assertEqual(res["source"], "sqlite")
 
     def test_multi_table_company_and_leave(self):
         """Company location + Leave days."""
         res = process_query("Where is the company located and how many annual leave days do employees get?")
-        self.assertIn("Chennai", res["answer"])
-        self.assertIn("30", res["answer"])
+        self.assertIn("Hyderabad", res["answer"])
+        self.assertIn("24", res["answer"])
         self.assertEqual(res["source"], "sqlite")
 
     def test_multi_table_three_operations_company_dept_leave(self):
         """Test 4: Three operations across company, location, and leave allowance."""
         res = process_query("What is the company name, where is it located, and how many annual leave days are available?")
-        self.assertIn("NextGen AI", res["answer"])
-        self.assertIn("Chennai", res["answer"])
-        self.assertIn("30", res["answer"])
+        self.assertIn("TechNova", res["answer"])
+        self.assertIn("Hyderabad", res["answer"])
+        self.assertIn("24", res["answer"])
         self.assertEqual(res["source"], "sqlite")
         self.assertGreaterEqual(res["queries_executed"], 2)
 
     def test_multi_table_two_departments_and_leave(self):
         """Test 5: AI department size, Backend department size, and annual leave allowance."""
         res = process_query("Tell me the AI department size, Backend department size, and annual leave allowance.")
-        self.assertIn("200", res["answer"])
-        self.assertIn("150", res["answer"])
-        self.assertIn("30", res["answer"])
+        self.assertIn("80", res["answer"])
+        self.assertIn("120", res["answer"])
+        self.assertIn("24", res["answer"])
         self.assertEqual(res["source"], "sqlite")
         self.assertGreaterEqual(res["queries_executed"], 2)
 
     def test_natural_language_variation_vacation_and_team(self):
         """Natural-language variation: team size and vacation allowance."""
         res = process_query("How large is the AI team and what's our vacation allowance?")
-        self.assertIn("200", res["answer"])
-        self.assertIn("30", res["answer"])
+        self.assertIn("80", res["answer"])
+        self.assertIn("24", res["answer"])
         self.assertEqual(res["source"], "sqlite")
 
     def test_natural_language_variation_workforce(self):
         """Natural-language variation: workforce and annual leave."""
         res = process_query("What's the workforce of AI and how much annual leave do employees get?")
-        self.assertIn("200", res["answer"])
-        self.assertIn("30", res["answer"])
+        self.assertIn("80", res["answer"])
+        self.assertIn("24", res["answer"])
         self.assertEqual(res["source"], "sqlite")
 
     def test_natural_language_variation_location_plus_headcount(self):
         """Natural-language variation: location plus headcount."""
         res = process_query("Give me the company location plus the AI headcount.")
-        self.assertIn("Chennai", res["answer"])
-        self.assertIn("200", res["answer"])
+        self.assertIn("Hyderabad", res["answer"])
+        self.assertIn("80", res["answer"])
         self.assertEqual(res["source"], "sqlite")
 
     def test_unsupported_and_supported_combination_ceo_and_ai(self):
         """CEO name (unsupported) + AI headcount (supported)."""
         res = process_query("What is the CEO's name and how many employees are in AI?")
-        self.assertIn("200", res["answer"])
+        self.assertIn("80", res["answer"])
         # Must refuse the CEO part without inventing a name
         ans_lower = res["answer"].lower()
         self.assertTrue(
@@ -466,7 +541,7 @@ class TestPhase5MultiQueryReasoning(unittest.TestCase):
     def test_unsupported_and_supported_combination_revenue_and_leave(self):
         """Company revenue (unsupported) + Leave days (supported)."""
         res = process_query("What is the company revenue and annual leave allowance?")
-        self.assertIn("30", res["answer"])
+        self.assertIn("24", res["answer"])
         ans_lower = res["answer"].lower()
         self.assertTrue(
             any(w in ans_lower for w in ["revenue", "not available", "not found", "unavailable"]),
@@ -476,14 +551,15 @@ class TestPhase5MultiQueryReasoning(unittest.TestCase):
     def test_security_sql_injection_defense(self):
         """SQL injection attempt must not execute arbitrary SQL or drop tables."""
         res = process_query("How many employees are in AI; DROP TABLE departments;")
-        self.assertIn("200", res["answer"])
+        self.assertIn("80", res["answer"])
 
-        # Verify departments table is intact and has both departments
+        # Verify departments table is intact and has 3 departments
         kb = get_full_knowledge()
         dept_names = [d["name"] for d in kb["departments"]]
         self.assertIn("AI", dept_names)
         self.assertIn("Backend", dept_names)
-        self.assertEqual(len(dept_names), 2)
+        self.assertIn("Data Science", dept_names)
+        self.assertEqual(len(dept_names), 3)
 
     def test_security_prompt_injection_defense(self):
         """Prompt injection to generate SQL or delete DB must be safely refused."""
@@ -494,7 +570,62 @@ class TestPhase5MultiQueryReasoning(unittest.TestCase):
         )
         # Verify knowledge base is untouched
         kb = get_full_knowledge()
-        self.assertEqual(kb["company"]["name"], "NextGen AI")
+        self.assertEqual(kb["company"]["name"], "TechNova")
+
+
+class TestAdminTokenImportProtection(unittest.TestCase):
+    """Test X-Admin-Token protection for /knowledge/import (Part 0.5)."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_import_with_admin_token_set_requires_valid_header(self):
+        import io
+        fake_content = json.dumps({
+            "company": {"name": "Test", "location": "TestCity", "employees": 10},
+            "departments": [],
+            "leave_policy": []
+        }).encode()
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "super-secret-token-123"}):
+            # 1. Missing header -> 401
+            resp = self.client.post("/knowledge/import", files={"file": ("test.json", io.BytesIO(fake_content), "application/json")})
+            self.assertEqual(resp.status_code, 401)
+            self.assertNotIn("super-secret-token-123", resp.text)
+
+            # 2. Wrong header -> 401
+            resp = self.client.post(
+                "/knowledge/import",
+                headers={"X-Admin-Token": "wrong-token"},
+                files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
+            )
+            self.assertEqual(resp.status_code, 401)
+            self.assertNotIn("super-secret-token-123", resp.text)
+
+            # 3. Correct header -> 200
+            resp = self.client.post(
+                "/knowledge/import",
+                headers={"X-Admin-Token": "super-secret-token-123"},
+                files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
+            )
+            self.assertEqual(resp.status_code, 200)
+
+    def test_import_with_admin_token_unset_allows_request(self):
+        import io
+        fake_content = json.dumps({
+            "company": {"name": "Test", "location": "TestCity", "employees": 10},
+            "departments": [],
+            "leave_policy": []
+        }).encode()
+
+        env_copy = os.environ.copy()
+        env_copy.pop("ADMIN_TOKEN", None)
+        with patch.dict(os.environ, env_copy, clear=True):
+            resp = self.client.post(
+                "/knowledge/import",
+                files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
+            )
+            self.assertEqual(resp.status_code, 200)
 
 
 if __name__ == "__main__":

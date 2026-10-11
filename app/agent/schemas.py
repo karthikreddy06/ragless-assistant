@@ -222,6 +222,9 @@ class AgentResponse(BaseModel):
     llm_provider: Optional[str] = Field(default=None, description="Active LLM provider used ('ollama', 'nebius')")
     llm_model: Optional[str] = Field(default=None, description="Active LLM model ID")
     llm_calls_count: Optional[int] = Field(default=None, description="Count of LLM calls executed during processing")
+    llm_latency_ms: Optional[List[float]] = Field(
+        default=None, description="Per-call latency in milliseconds for LLM calls executed during processing"
+    )
     user_id: Optional[str] = Field(default=None, description="Active user ID context")
     memory_used: Optional[bool] = Field(default=None, description="Whether persistent memory tool was utilized")
     memory_writes: Optional[List[Dict[str, Any]]] = Field(

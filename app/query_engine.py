@@ -383,7 +383,7 @@ def process_query(question: str) -> Dict[str, Any]:
         answer = (
             f"I could not find information about that in the company database. "
             f"{company_name}'s knowledge base only contains company details (name, location, total employees), "
-            f"department headcounts, and leave policies."
+            f"department headcounts, leave policies, and onboarding checklist items."
         )
 
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)

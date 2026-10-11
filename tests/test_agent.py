@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+import tempfile
 import unittest
 from typing import Any, Dict, Optional
 import requests
@@ -9,7 +12,31 @@ from app.agent.planner import AgentPlanner, PlanParsingError
 from app.agent.schemas import AgentPlan, PlanStep, ToolResult
 from app.agent.validator import PlanValidationError, validate_plan
 from app.agent.verifier import Verifier
+from app.database import initialize_database, seed_database
 from app.main import app
+
+_AGENT_TEMP_DIR = None
+_ORIG_AGENT_DB = None
+
+
+def setUpModule():
+    global _AGENT_TEMP_DIR, _ORIG_AGENT_DB
+    _AGENT_TEMP_DIR = tempfile.TemporaryDirectory()
+    temp_db_path = Path(_AGENT_TEMP_DIR.name) / "test_agent_kb.db"
+    _ORIG_AGENT_DB = os.environ.get("DATABASE_PATH")
+    os.environ["DATABASE_PATH"] = str(temp_db_path)
+    initialize_database()
+    seed_database()
+
+
+def tearDownModule():
+    global _AGENT_TEMP_DIR, _ORIG_AGENT_DB
+    if _ORIG_AGENT_DB is not None:
+        os.environ["DATABASE_PATH"] = _ORIG_AGENT_DB
+    elif "DATABASE_PATH" in os.environ:
+        del os.environ["DATABASE_PATH"]
+    if _AGENT_TEMP_DIR:
+        _AGENT_TEMP_DIR.cleanup()
 
 
 class FakeLLMClient(LLMClient):
@@ -364,6 +391,54 @@ class TestAgentEndpoint(unittest.TestCase):
         root_resp = client.get("/")
         self.assertEqual(root_resp.status_code, 200)
         self.assertIn("agent_ask", root_resp.json()["endpoints"])
+
+
+class TestLLMCallCountingAccuracy(unittest.TestCase):
+    """Part 0.3: Test accurate counting of all LLM calls including inner company_knowledge calls."""
+
+    def test_company_knowledge_inner_llm_calls_counted(self):
+        import json
+        from unittest.mock import patch
+
+        class MultiCallFakeClient(LLMClient):
+            def __init__(self):
+                self.calls = []
+
+            @property
+            def provider_name(self) -> str:
+                return "fake_counting_provider"
+
+            @property
+            def model_name(self) -> str:
+                return "fake_counting_model"
+
+            def generate_json(self, prompt: str, system: Optional[str] = None, temperature: float = 0.0) -> str:
+                self.calls.append({"type": "json", "prompt": prompt, "system": system})
+                full_text = (prompt or "") + " " + (system or "")
+                if "Allowed Tools:" in full_text or "task planner" in full_text or "Generate the plan in JSON" in full_text:
+                    return json.dumps({
+                        "goal": "Get AI department headcount",
+                        "steps": [{"tool": "company_knowledge", "input": "How many employees in AI?"}]
+                    })
+                return json.dumps({
+                    "queries": [{"intent": "department_employees", "query_type": "dept_headcount", "entity": "AI"}]
+                })
+
+            def generate_text(self, prompt: str, system: Optional[str] = None, temperature: float = 0.0) -> str:
+                self.calls.append({"type": "text", "prompt": prompt})
+                return "The AI department has 80 employees."
+
+        fake_client = MultiCallFakeClient()
+        orchestrator = AgentOrchestrator(llm_client=fake_client)
+        with patch("app.agent.orchestrator.detect_fast_path_plan", return_value=None):
+            resp = orchestrator.run("How many employees in AI?")
+
+        self.assertEqual(resp.llm_calls_count, len(fake_client.calls))
+        self.assertEqual(resp.llm_calls_count, 4)
+        self.assertIsNotNone(resp.llm_latency_ms)
+        self.assertEqual(len(resp.llm_latency_ms), 4)
+        for lat in resp.llm_latency_ms:
+            self.assertGreaterEqual(lat, 0.0)
 
 
 if __name__ == "__main__":

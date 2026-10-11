@@ -5,7 +5,14 @@ import sys
 import time
 from typing import Any, Dict, List
 
+import os
+import tempfile
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+if "DATABASE_PATH" not in os.environ:
+    _smoke_temp = tempfile.TemporaryDirectory()
+    os.environ["DATABASE_PATH"] = str(Path(_smoke_temp.name) / "smoke_memory.db")
 
 from app.agent.llm import OllamaClient
 from app.agent.memory import get_memory_store

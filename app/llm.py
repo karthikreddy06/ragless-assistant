@@ -128,6 +128,8 @@ def _call_ollama_generate(prompt: str, json_format: bool = False, temperature: f
     if json_format:
         payload["format"] = "json"
 
+    import time as _time
+    t0 = _time.perf_counter()
     try:
         response = requests.post(url, json=payload, timeout=OLLAMA_TIMEOUT)
     except requests.exceptions.ConnectionError as e:
@@ -147,6 +149,15 @@ def _call_ollama_generate(prompt: str, json_format: bool = False, temperature: f
         )
     if response.status_code != 200:
         raise OllamaError(f"Ollama returned error status {response.status_code}: {response.text}")
+
+    latency_ms = round((_time.perf_counter() - t0) * 1000, 2)
+    try:
+        from app.agent.executor import current_run_context
+        ctx = current_run_context.get()
+        if ctx is not None:
+            ctx.record_llm_call(latency_ms)
+    except Exception:
+        pass
 
     data = response.json()
     return data.get("response", "").strip()
@@ -277,7 +288,7 @@ def generate_grounded_answer(
         return (
             f"I could not find relevant information in the company database. "
             f"I can answer questions regarding {company_name}'s company details (name, location, total employees), "
-            f"department headcounts, and leave policies."
+            f"department headcounts, leave policies, and onboarding checklist items."
         )
 
     synthesis_prompt = f"""You are a professional knowledge assistant for {company_name}.

@@ -242,17 +242,28 @@ def execute_memory(
         )
 
 
+from contextvars import ContextVar
+
+current_run_context: ContextVar[Optional["RunContext"]] = ContextVar("current_run_context", default=None)
+current_active_client: ContextVar[Optional[Any]] = ContextVar("current_active_client", default=None)
+
+
 class RunContext:
     """
     Per-run execution context ensuring request isolation.
-    Tracks taint state and web call counts per request so concurrent requests
-    on a shared ToolExecutor do not overwrite or race each other.
+    Tracks taint state, web call counts, LLM call counts, and per-call latencies per request.
     """
 
     def __init__(self, run_id: Optional[str] = None):
         self.run_id = run_id
         self.is_tainted: bool = False
         self.web_calls_count: int = 0
+        self.llm_calls_count: int = 0
+        self.llm_latency_ms: list[float] = []
+
+    def record_llm_call(self, latency_ms: float = 0.0) -> None:
+        self.llm_calls_count += 1
+        self.llm_latency_ms.append(round(latency_ms, 2))
 
 
 class ToolExecutor:

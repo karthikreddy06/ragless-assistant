@@ -380,6 +380,54 @@ class NebiusClient(LLMClient):
         )
 
 
+class CountingLLMClient(LLMClient):
+    """
+    Counting wrapper around any LLMClient that records invocation counts
+    and per-call latency into a RunContext.
+    """
+
+    def __init__(self, inner: LLMClient, run_context: Optional[Any] = None):
+        self._inner = inner
+        self._run_context = run_context
+
+    @property
+    def provider_name(self) -> str:
+        return getattr(self._inner, "provider_name", "unknown")
+
+    @property
+    def model_name(self) -> str:
+        return getattr(self._inner, "model_name", "unknown")
+
+    def generate_text(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 0.0,
+    ) -> str:
+        t0 = time.perf_counter()
+        res = self._inner.generate_text(prompt=prompt, system=system, temperature=temperature)
+        latency = round((time.perf_counter() - t0) * 1000, 2)
+        if self._run_context is not None:
+            self._run_context.record_llm_call(latency)
+        return res
+
+    def generate_json(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 0.0,
+    ) -> str:
+        t0 = time.perf_counter()
+        res = self._inner.generate_json(prompt=prompt, system=system, temperature=temperature)
+        latency = round((time.perf_counter() - t0) * 1000, 2)
+        if self._run_context is not None:
+            self._run_context.record_llm_call(latency)
+        return res
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
 # ==============================================================================
 # Provider Factory & Health
 # ==============================================================================
@@ -387,8 +435,17 @@ class NebiusClient(LLMClient):
 def get_llm_client() -> LLMClient:
     """
     Factory function returning the configured LLMClient.
-    Provider selected via LLM_PROVIDER env variable ('ollama' or 'nebius').
+    If an active client is set in the current execution context, returns it.
+    Otherwise selects provider via LLM_PROVIDER env variable ('ollama' or 'nebius').
     """
+    try:
+        from app.agent.executor import current_active_client
+        active = current_active_client.get()
+        if active is not None:
+            return active
+    except Exception:
+        pass
+
     provider = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
 
     if provider == "ollama":
