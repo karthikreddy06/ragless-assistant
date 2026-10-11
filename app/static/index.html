@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="RAGless Autonomous Company Operations Agent with grounded retrieval, verification, and deterministic execution.">
+  <title>RAGless · Autonomous Company Operations Agent</title>
+  <link rel="stylesheet" href="/ui/styles.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            <path d="M2 17l10 5 10-5"></path>
+            <path d="M2 12l10 5 10-5"></path>
+          </svg>
+        </div>
+        <div class="brand-titles">
+          <h1 class="brand-title">RAGless</h1>
+          <p class="brand-subtitle">Autonomous Company Operations Agent</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <div id="status-pill" class="status-pill status-loading" aria-live="polite">
+          <span class="status-indicator" aria-hidden="true"></span>
+          <span id="status-text" class="status-text">Connecting...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      <div class="primary-column">
+        <!-- Goal Input Box -->
+        <section class="card goal-card" aria-labelledby="goal-heading">
+          <div class="card-header">
+            <h2 id="goal-heading" class="card-title">Agent Objective</h2>
+            <div class="user-id-wrapper">
+              <label for="user-id-input" class="field-label">User ID:</label>
+              <input type="text" id="user-id-input" class="text-input" value="demo-user" spellcheck="false" maxlength="64">
+              <span class="field-hint">(demo identifier)</span>
+            </div>
+          </div>
+
+          <form id="agent-form" class="goal-form">
+            <div class="input-group">
+              <label for="goal-input" class="sr-only">Enter agent objective or question</label>
+              <textarea id="goal-input" class="goal-textarea" rows="3" placeholder="Ask a question, request onboarding steps, or assign a task..." required></textarea>
+            </div>
+
+            <div class="chips-container" aria-label="Example prompts">
+              <span class="chips-label">Suggestions:</span>
+              <button type="button" class="chip" data-prompt="Prepare everything I need for my first week">First week preparation</button>
+              <button type="button" class="chip" data-prompt="What do I still need to do?">Remaining onboarding</button>
+              <button type="button" class="chip" data-prompt="Create tasks for my onboarding">Create onboarding tasks</button>
+              <button type="button" class="chip" data-prompt="How does our annual leave compare to the UK statutory minimum?">Leave vs UK statutory</button>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="run-btn" class="btn btn-primary">
+                <span class="btn-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </span>
+                <span class="btn-text">Run Agent</span>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Loading / Progress State -->
+        <section id="working-card" class="card working-card hidden" aria-live="polite">
+          <div class="working-content">
+            <div class="spinner" aria-hidden="true"></div>
+            <div class="working-details">
+              <h3 class="working-title">Agent Working...</h3>
+              <p class="working-desc">Planning steps and querying verified internal & external sources.</p>
+            </div>
+            <div class="working-timer">
+              <span class="timer-label">Elapsed:</span>
+              <span id="elapsed-counter" class="timer-value">0.0s</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Error Card -->
+        <section id="error-card" class="card error-card hidden" role="alert">
+          <div class="error-header">
+            <div class="error-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h3 id="error-title" class="error-title">Execution Error</h3>
+          </div>
+          <p id="error-message" class="error-message"></p>
+        </section>
+
+        <!-- Live Results Region -->
+        <div id="results-region" role="region" aria-label="Agent Results">
+          <!-- Answer Card -->
+          <section id="answer-card" class="card answer-card hidden">
+            <div class="card-header">
+              <h2 class="card-title">Grounded Answer</h2>
+              <div id="verification-badge" class="badge"></div>
+            </div>
+            <div id="answer-text" class="answer-text"></div>
+            <div id="unresolved-box" class="unresolved-box hidden">
+              <h4 class="unresolved-title">Unresolved Items:</h4>
+              <ul id="unresolved-list" class="unresolved-list"></ul>
+            </div>
+          </section>
+
+          <!-- Agent Activity Trace -->
+          <section id="trace-card" class="card trace-card hidden">
+            <div class="card-header">
+              <h2 class="card-title">Agent Activity Trace</h2>
+              <span id="trace-step-count" class="badge badge-neutral"></span>
+            </div>
+            <div class="trace-section">
+              <h3 class="trace-subtitle">Execution Plan & Tool Results</h3>
+              <div id="trace-steps" class="timeline"></div>
+            </div>
+            <div class="trace-section">
+              <h3 class="trace-subtitle">Deterministic Verification Checks</h3>
+              <div id="verification-checks" class="checks-grid"></div>
+            </div>
+          </section>
+
+          <!-- Evidence Panel (Collapsible) -->
+          <details id="evidence-panel" class="card collapsible-panel hidden">
+            <summary class="panel-summary">
+              <span class="summary-title">Verified Evidence & Sources</span>
+              <span id="evidence-count" class="badge badge-neutral"></span>
+            </summary>
+            <div class="panel-body">
+              <div class="evidence-block">
+                <h4 class="block-subtitle">External Web Sources</h4>
+                <div id="sources-list" class="sources-list"></div>
+              </div>
+              <div class="evidence-block">
+                <h4 class="block-subtitle">Retrieved Internal Data</h4>
+                <div id="internal-evidence" class="data-table-container"></div>
+              </div>
+            </div>
+          </details>
+
+          <!-- Actions Panel -->
+          <section id="actions-panel" class="card actions-panel hidden">
+            <div class="card-header">
+              <h2 class="card-title">State Modifications</h2>
+            </div>
+            <div class="actions-grid">
+              <div class="action-column">
+                <h3 class="action-subtitle">Memory Writes</h3>
+                <div id="memory-writes-list" class="action-list"></div>
+              </div>
+              <div class="action-column">
+                <h3 class="action-subtitle">Tasks Changed</h3>
+                <div id="tasks-changed-list" class="action-list"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Secondary Column: Tasks & Onboarding Progress -->
+      <aside class="sidebar-column">
+        <!-- Onboarding Progress Panel -->
+        <section class="card progress-card" aria-labelledby="progress-heading">
+          <div class="card-header">
+            <h2 id="progress-heading" class="card-title">Onboarding Progress</h2>
+            <span id="progress-status-badge" class="badge badge-neutral">Loading...</span>
+          </div>
+          <div class="progress-body">
+            <div class="progress-meta">
+              <span id="progress-counts" class="progress-counts">0 / 0 Completed</span>
+              <span id="progress-percent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+              <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div class="profile-info">
+              <div class="profile-row">
+                <span class="info-label">Role:</span>
+                <span id="profile-role" class="info-value">Not set</span>
+              </div>
+              <div class="profile-row">
+                <span class="info-label">Department:</span>
+                <span id="profile-department" class="info-value">Not set</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- User Tasks Panel -->
+        <section class="card tasks-card" aria-labelledby="tasks-heading">
+          <div class="card-header">
+            <h2 id="tasks-heading" class="card-title">Assigned Tasks</h2>
+            <span id="tasks-count-badge" class="badge badge-neutral">0</span>
+          </div>
+          <div class="tasks-body">
+            <div id="tasks-container" class="tasks-container">
+              <p class="empty-notice">No tasks recorded for user.</p>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- Footer Stats Bar -->
+    <footer class="app-footer">
+      <div class="footer-stats">
+        <div class="stat-item">
+          <span class="stat-label">Latency:</span>
+          <span id="stat-latency" class="stat-value">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">LLM Calls:</span>
+          <span id="stat-llm-calls" class="stat-value">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Web Calls:</span>
+          <span id="stat-web-calls" class="stat-value">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Provider/Model:</span>
+          <span id="stat-model" class="stat-value">-</span>
+        </div>
+      </div>
+      <div class="footer-note">
+        <span>Deterministic multi-step execution &middot; Untrusted LLM output isolation</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/ui/app.js" defer></script>
+</body>
+</html>
