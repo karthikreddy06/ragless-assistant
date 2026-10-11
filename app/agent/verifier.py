@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from app.agent.schemas import AgentPlan, CheckItem, ToolResult, Verification
 
@@ -200,6 +200,26 @@ class Verifier:
                     if acknowledged else
                     "Failed: Answer did not state external verification was unavailable.",
                 ))
+
+        # 8. Check: External comparison coverage
+        external_cues = ["compare", "versus", "statutory", "current", "latest", "industry"]
+        q_lower = question.lower()
+        has_external_cue = any(re.search(r"\b" + re.escape(cue) + r"\b", q_lower) for cue in external_cues)
+        has_web_in_plan = any(step.tool.strip().lower() == "web_research" for step in plan.steps)
+
+        if has_external_cue and not has_web_in_plan:
+            checks.append(CheckItem(
+                name="external_comparison_coverage",
+                passed=False,
+                detail="Question contains comparison or external cues, but no web_research step was planned.",
+            ))
+            unresolved.append("external comparison not performed")
+        elif has_external_cue and has_web_in_plan:
+            checks.append(CheckItem(
+                name="external_comparison_coverage",
+                passed=True,
+                detail="External comparison step included in plan.",
+            ))
 
         # Overall verification outcome
         overall_passed = all(c.passed for c in checks)

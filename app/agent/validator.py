@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Any, Dict, Set
+from typing import Any, Dict, List, Optional, Set
 from pydantic import ValidationError
 
 from app.agent.schemas import AgentPlan, PlanStep
@@ -55,6 +55,23 @@ COMPANY_SPECIFIC_TERMS = [
     r"\bhow\s+many\s+employees\b",
     r"\btotal\s+employees\b",
 ]
+
+
+EXTERNAL_PHRASE_PATTERNS = [
+    r"\b(?:uk|us|eu|statutory|minimum|law|laws|legal|industry|market|benchmark|benchmarks|competitors?|external|standards?|global|federal|nationwide|market\s+rate)\b",
+]
+
+
+def extract_external_phrases(text: str) -> List[str]:
+    """Extracts explicit external cues or phrases from text."""
+    if not text:
+        return []
+    t_lower = text.lower()
+    matches = []
+    for pat in EXTERNAL_PHRASE_PATTERNS:
+        for m in re.finditer(pat, t_lower):
+            matches.append(m.group(0))
+    return matches
 
 
 class PlanValidationError(ValueError):
@@ -185,12 +202,23 @@ def validate_plan(
             raise PlanValidationError(
                 "Routing guard: internal company-specific questions cannot be planned as web_research-only."
             )
-        # Questions asking for internal head/leadership/onboarding/leave cannot use web_research
-        if re.search(r"\b(?:head\s+of|leave\s+policy|onboarding)\b", user_question.lower()):
-            if any(step.tool.strip().lower() == "web_research" for step in plan.steps):
+
+        # Extended routing guard: a company-specific question may not include a web_research step
+        # whose query was not derived from an explicitly external phrase in the question.
+        web_steps = [s for s in plan.steps if s.tool.strip().lower() == "web_research"]
+        if web_steps:
+            external_cues = extract_external_phrases(user_question)
+            if not external_cues:
                 raise PlanValidationError(
-                    "Routing guard: internal company questions cannot use web_research."
+                    "Routing guard: company-specific question may not include a web_research step without an explicitly external phrase in the question."
                 )
+            for ws in web_steps:
+                ws_args = ws.args or {}
+                ws_query = str(ws_args.get("query") or ws.input or "").lower()
+                if not any(cue in ws_query for cue in external_cues):
+                    raise PlanValidationError(
+                        "Routing guard: web_research step query in company-specific question must be derived from an explicitly external phrase in the question."
+                    )
 
     # 4. Tool allowlist and security inspection per step
     for idx, step in enumerate(plan.steps, start=1):

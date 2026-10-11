@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from app.agent.executor import ToolExecutor
+from app.agent.executor import RunContext, ToolExecutor
 from app.agent.fast_path import detect_fast_path_plan
 from app.agent.llm import LLMClient, get_llm_client
 from app.agent.memory import validate_user_id
@@ -62,7 +62,7 @@ class AgentOrchestrator:
         """
         start_time = time.perf_counter()
         clean_q = question.strip()
-        self.executor.reset_run()
+        run_context = RunContext()
 
         try:
             valid_uid = validate_user_id(user_id)
@@ -198,7 +198,12 @@ class AgentOrchestrator:
         # Step 3: Tool Execution (bounded by MAX_AGENT_STEPS)
         tool_results: List[ToolResult] = []
         for step in plan.steps[:MAX_AGENT_STEPS]:
-            res = self.executor.execute(step, user_id=valid_uid, question=clean_q)
+            res = self.executor.execute(
+                step,
+                user_id=valid_uid,
+                question=clean_q,
+                run_context=run_context,
+            )
             tool_results.append(res)
 
         # Step 4: Observation and Fact Aggregation
@@ -278,7 +283,7 @@ class AgentOrchestrator:
             memory_writes=memory_writes if memory_writes else None,
             web_used=web_used,
             sources=sources if sources else None,
-            web_calls_count=self.executor.web_calls_count if web_used else 0,
+            web_calls_count=run_context.web_calls_count if web_used else 0,
         )
 
     def _synthesize_grounded_answer(

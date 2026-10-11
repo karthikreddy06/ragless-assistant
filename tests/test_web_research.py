@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Optional
 from unittest.mock import patch
 
-from app.agent.executor import ToolExecutor
+from app.agent.executor import RunContext, ToolExecutor
 from app.agent.memory import MemoryStore
 from app.agent.orchestrator import AgentOrchestrator
-from app.agent.schemas import AgentPlan, PlanStep
+from app.agent.schemas import AgentPlan, PlanStep, ToolResult
 from app.agent.validator import (
     ALLOWED_TOOLS,
     PlanValidationError,
@@ -220,6 +220,32 @@ class TestWebResearchSecurityAndValidator(unittest.TestCase):
             with self.assertRaises(PlanValidationError) as ctx:
                 validate_plan(plan_dict, user_question=q)
             self.assertIn("internal", str(ctx.exception).lower())
+
+    def test_routing_guard_rejects_memory_get_progress_and_web_research_on_company_question(self):
+        """A company question cannot combine memory.get_progress and web_research without an external phrase."""
+        plan_dict = {
+            "goal": "Check onboarding progress and search web",
+            "steps": [
+                {"tool": "memory", "operation": "get_progress", "args": {}},
+                {"tool": "web_research", "args": {"query": "onboarding checklist tips", "max_results": 2}},
+            ],
+        }
+        with self.assertRaises(PlanValidationError) as ctx:
+            validate_plan(plan_dict, user_question="What is my onboarding progress?")
+        self.assertIn("routing guard", str(ctx.exception).lower())
+
+    def test_routing_guard_rejects_company_question_with_web_query_not_derived_from_external_phrase(self):
+        """In a mixed question, web_research query must derive from the explicit external phrase."""
+        plan_dict = {
+            "goal": "Compare leave",
+            "steps": [
+                {"tool": "company_knowledge", "input": "How many days leave?"},
+                {"tool": "web_research", "args": {"query": "internal company annual leave days"}},
+            ],
+        }
+        with self.assertRaises(PlanValidationError) as ctx:
+            validate_plan(plan_dict, user_question="How does our annual leave compare to UK statutory minimum?")
+        self.assertIn("derived from an explicitly external phrase", str(ctx.exception).lower())
 
 
 class TestWebResearchExecutorAndTaint(unittest.TestCase):
@@ -459,6 +485,60 @@ class TestWebResearchVerifierAndRedaction(unittest.TestCase):
         passed, reason = verifier.verify_web_claims_grounded(ans, snippets)
         self.assertTrue(passed)
 
+    def test_verifier_flags_external_comparison_not_performed(self):
+        """Questions containing comparison cues without a web_research step flag external comparison not performed."""
+        verifier = Verifier()
+        plan = AgentPlan(
+            goal="Answer annual leave query",
+            steps=[PlanStep(tool="company_knowledge", input="How many days annual leave?")]
+        )
+        tool_results = [
+            ToolResult(
+                tool="company_knowledge",
+                success=True,
+                source="sqlite",
+                data=[{"leave_type": "annual", "days": 24}]
+            )
+        ]
+        answer = "Our annual leave policy provides 24 days of annual leave."
+        verification = verifier.verify(
+            question="How does our annual leave compare to UK statutory minimum?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer,
+        )
+        self.assertFalse(verification.passed)
+        self.assertIn("external comparison not performed", verification.unresolved)
+        coverage_check = next((c for c in verification.checks if c.name == "external_comparison_coverage"), None)
+        self.assertIsNotNone(coverage_check)
+        self.assertFalse(coverage_check.passed)
+
+    def test_verifier_passes_external_comparison_when_web_step_included(self):
+        """Questions containing comparison cues pass external_comparison_coverage when web_research step exists."""
+        verifier = Verifier()
+        plan = AgentPlan(
+            goal="Compare annual leave",
+            steps=[
+                PlanStep(tool="company_knowledge", input="How many days annual leave?"),
+                PlanStep(tool="web_research", args={"query": "UK statutory leave"})
+            ]
+        )
+        tool_results = [
+            ToolResult(tool="company_knowledge", success=True, source="sqlite", data=[{"leave_type": "annual", "days": 24}]),
+            ToolResult(tool="web_research", success=True, source="tavily", data=[{"title": "UK Gov", "url": "https://gov.uk/leave", "snippet": "28 days"}])
+        ]
+        answer = "Our annual leave is 24 days, compared to UK statutory minimum of 28 days [https://gov.uk/leave]."
+        verification = verifier.verify(
+            question="How does our annual leave compare to UK statutory minimum?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer,
+        )
+        self.assertTrue(verification.passed)
+        coverage_check = next((c for c in verification.checks if c.name == "external_comparison_coverage"), None)
+        self.assertIsNotNone(coverage_check)
+        self.assertTrue(coverage_check.passed)
+
 
 class TestWebResearchOrchestratorEndToEnd(unittest.TestCase):
     """End-to-end deterministic tests with AgentOrchestrator using FakeLLMClient & FakeWebSearchClient."""
@@ -671,6 +751,73 @@ class TestWebResearchOrchestratorEndToEnd(unittest.TestCase):
         self.assertEqual(len(resp.sources), 2)
         urls = {s["url"] for s in resp.sources}
         self.assertEqual(urls, {"https://example.com/docA", "https://example.com/docB"})
+
+    def test_taint_run_context_thread_concurrency(self):
+        """
+        Concurrency test: two threads on the same shared ToolExecutor & AgentOrchestrator.
+        Thread 1 runs a web call then tries a write.
+        Thread 2 starts a request in between (which in a naive design would clear taint on executor).
+        Thread 1's write must STILL be rejected due to per-run RunContext.
+        """
+        import threading
+
+        fake_web = FakeWebSearchClient(
+            canned_results=[{"title": "Docs", "url": "https://python.org", "snippet": "Notes"}]
+        )
+        shared_executor = ToolExecutor(memory_store=self.memory_store, web_client=fake_web)
+        llm = FakeLLMClient()
+        orchestrator = AgentOrchestrator(llm_client=llm, executor=shared_executor)
+
+        t1_write_result = None
+        t1_step1_done = threading.Event()
+        t2_finished = threading.Event()
+
+        def thread1_worker():
+            nonlocal t1_write_result
+            ctx1 = RunContext(run_id="req-1")
+            web_step = PlanStep(tool="web_research", args={"query": "python docs"})
+            shared_executor.execute_step(web_step, user_id="u1", run_context=ctx1)
+            t1_step1_done.set()
+
+            # Wait for Thread 2 to run in between
+            t2_finished.wait(timeout=3.0)
+
+            # Thread 1 now tries a write using its run_context
+            mark_step = PlanStep(tool="memory", operation="mark_item_complete", args={"item_id": 1})
+            t1_write_result = shared_executor.execute_step(
+                mark_step,
+                user_id="u1",
+                user_question="I completed security training",
+                run_context=ctx1,
+            )
+
+        def thread2_worker():
+            # Wait for Thread 1 to do web research
+            t1_step1_done.wait(timeout=3.0)
+
+            # Thread 2 runs a clean request on same shared executor
+            ctx2 = RunContext(run_id="req-2")
+            shared_executor.reset_run()  # Simulates naive reset or clean request
+            step_clean = PlanStep(tool="company_knowledge", input="How many employees?")
+            shared_executor.execute_step(step_clean, user_id="u2", run_context=ctx2)
+            t2_finished.set()
+
+        t1 = threading.Thread(target=thread1_worker)
+        t2 = threading.Thread(target=thread2_worker)
+
+        t1.start()
+        t2.start()
+
+        t1.join(timeout=5.0)
+        t2.join(timeout=5.0)
+
+        self.assertIsNotNone(t1_write_result)
+        self.assertFalse(t1_write_result.success)
+        self.assertIn("taint", t1_write_result.error.lower())
+        self.assertEqual(
+            t1_write_result.error,
+            "Security violation: memory write prohibited after web content has entered the execution run (taint rule)."
+        )
 
 
 if __name__ == "__main__":

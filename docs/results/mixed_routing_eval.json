@@ -1,0 +1,126 @@
+{
+  "results": {
+    "fast_path_true": [
+      {
+        "run": 1,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge",
+          "web_research"
+        ],
+        "web_called": true,
+        "verified": true,
+        "unresolved": [],
+        "answer": "TechNova's annual leave entitlement is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+      },
+      {
+        "run": 2,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge",
+          "web_research"
+        ],
+        "web_called": true,
+        "verified": true,
+        "unresolved": [],
+        "answer": "TechNova's annual leave entitlement is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+      },
+      {
+        "run": 3,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge",
+          "web_research"
+        ],
+        "web_called": true,
+        "verified": false,
+        "unresolved": [
+          "Ungrounded claims or version strings found in answer: ['4']"
+        ],
+        "answer": "TechNova's annual leave is 24 days, which is 4 days less than the UK statutory minimum of 28 days.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+      }
+    ],
+    "fast_path_false": [
+      {
+        "run": 1,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge",
+          "web_research"
+        ],
+        "web_called": true,
+        "verified": true,
+        "unresolved": [],
+        "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+      },
+      {
+        "run": 2,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge",
+          "web_research"
+        ],
+        "web_called": true,
+        "verified": false,
+        "unresolved": [
+          "Ungrounded claims or version strings found in answer: ['4']"
+        ],
+        "answer": "TechNova's annual leave is 24 days, which is 4 days less than the UK statutory minimum of 28 days.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+      },
+      {
+        "run": 3,
+        "question": "How does our annual leave compare to UK statutory minimum?",
+        "plan_valid": true,
+        "tools_chosen": [
+          "company_knowledge",
+          "web_research"
+        ],
+        "web_called": true,
+        "verified": true,
+        "unresolved": [],
+        "answer": "TechNova's annual leave entitlement is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+      }
+    ]
+  },
+  "sample_verification": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "all_steps_executed",
+        "passed": true,
+        "detail": "All 2 planned steps executed successfully."
+      },
+      {
+        "name": "evidence_fact_grounding",
+        "passed": true,
+        "detail": "All numbers in answer appear in verified evidence."
+      },
+      {
+        "name": "security_no_internal_leak",
+        "passed": true,
+        "detail": "No internal SQL table names or database syntax leaked in answer."
+      },
+      {
+        "name": "web_sources_cited",
+        "passed": true,
+        "detail": "Web research sources and URLs cited in grounded response."
+      },
+      {
+        "name": "web_claims_grounded",
+        "passed": true,
+        "detail": "All numbers and version strings in web-assisted answer are grounded in retrieved snippets."
+      },
+      {
+        "name": "external_comparison_coverage",
+        "passed": true,
+        "detail": "External comparison step included in plan."
+      }
+    ],
+    "unresolved": []
+  }
+}

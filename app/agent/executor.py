@@ -242,6 +242,19 @@ def execute_memory(
         )
 
 
+class RunContext:
+    """
+    Per-run execution context ensuring request isolation.
+    Tracks taint state and web call counts per request so concurrent requests
+    on a shared ToolExecutor do not overwrite or race each other.
+    """
+
+    def __init__(self, run_id: Optional[str] = None):
+        self.run_id = run_id
+        self.is_tainted: bool = False
+        self.web_calls_count: int = 0
+
+
 class ToolExecutor:
     """Registry mapping allowed tool names to deterministic Python functions with run-level security guards."""
 
@@ -256,21 +269,19 @@ class ToolExecutor:
         self._memory_store = memory_store or get_memory_store()
         self._web_client = web_client or web_search_client
         self.max_web_calls = max_web_calls
-        self._tainted = False
-        self._web_calls_count = 0
+        self._default_context = RunContext()
 
     def reset_run(self):
-        """Reset run-level security state (taint flag and web call count)."""
-        self._tainted = False
-        self._web_calls_count = 0
+        """Reset default fallback context."""
+        self._default_context = RunContext()
 
     @property
     def is_tainted(self) -> bool:
-        return self._tainted
+        return self._default_context.is_tainted
 
     @property
     def web_calls_count(self) -> int:
-        return self._web_calls_count
+        return self._default_context.web_calls_count
 
     def execute(
         self,
@@ -278,14 +289,16 @@ class ToolExecutor:
         user_id: str = "demo-user",
         question: Optional[str] = None,
         user_question: Optional[str] = None,
+        run_context: Optional[RunContext] = None,
     ) -> ToolResult:
         """Executes a single validated PlanStep through the tool registry."""
+        ctx = run_context if run_context is not None else self._default_context
         effective_question = question or user_question
         tool_name = step.tool.strip().lower()
 
         # TAINT RULE ENFORCEMENT:
         # Once web content has entered a run, memory write operations are strictly prohibited!
-        if self._tainted and tool_name == "memory":
+        if ctx.is_tainted and tool_name == "memory":
             op = (step.operation or "").strip().lower()
             if op in ("set_profile", "mark_item_complete", "set_onboarding_status"):
                 logger.warning(
@@ -317,12 +330,13 @@ class ToolExecutor:
             res = execute_web_research(
                 step,
                 client=self._web_client,
-                call_count=self._web_calls_count,
+                call_count=ctx.web_calls_count,
                 max_calls=self.max_web_calls,
             )
-            self._web_calls_count += 1
+            ctx.web_calls_count += 1
             if res.success and res.data:
-                self._tainted = True  # Taint the execution run
+                ctx.is_tainted = True  # Taint the execution run
+                self._default_context.is_tainted = True
             return res
 
         return ToolResult(

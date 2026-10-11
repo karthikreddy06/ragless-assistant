@@ -83,23 +83,24 @@ All outbound queries proposed by the planner are inspected prior to dispatch:
 ## 5. Verification Checks (`app/agent/verifier.py`)
 
 Zero-LLM deterministic Python assertions:
-1. **`web_sources_cited`**: When web research is used, verifies that the answer or sources block cites valid URLs, domains, or source citations. If search was unavailable, verifies that the answer explicitly states that external verification could not be completed.
+1. **`web_sources_cited`**: When web research is used, verifies that the answer or sources block cites valid URLs, domains, or source citations. Rejects vague markers without real URLs/domains.
 2. **`web_claims_grounded`**: Verifies that all numbers and version strings in the answer appear in the retrieved web snippets or verified database facts. Excludes markdown list markers (`1.`, `2.`).
+3. **`external_comparison_coverage`**: When question contains comparison or external cues ("compare", "versus", "statutory", "current", "latest", "industry") and the plan lacks a `web_research` step, flags unresolved item `"external comparison not performed"` and marks verification failed.
 
 ---
 
 ## 6. Verification Status & Live Key Disclaimer
 
 ### Safe Offline Test Suite (`tests/test_web_research.py`)
-- **Status**: **29 / 29 PASSED** (0 external network calls).
+- **Status**: **34 / 34 PASSED** (0 external network calls).
 - Covers:
   - Allowed tools validation and schema constraints (bounds, extra fields).
   - Outbound query guard rejections (user_id, emails, SQL text, API keys, internal table names).
-  - Routing guard rejections for internal company queries.
+  - Extended routing guard rejections for internal company queries and [memory.get_progress, web_research].
   - Executor execution, query caching, per-request call caps (`WEB_MAX_CALLS_PER_REQUEST = 2`).
-  - Taint rule enforcement blocking subsequent memory writes after web calls.
+  - `RunContext` per-run taint isolation and multi-threaded concurrency safety.
   - Resilience against auth errors, timeouts, and server errors.
-  - Verifier source citations and claim grounding.
+  - Verifier source citations, claim grounding, and external comparison coverage checks.
   - End-to-end multi-tool plans (`company_knowledge` + `web_research`).
   - Web snippet prompt injection resistance.
 

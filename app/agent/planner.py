@@ -67,7 +67,17 @@ class AgentPlanner:
             "- 'set_onboarding_status': User explicitly requests changing their status (args: {'status': 'not_started'|'in_progress'|'completed'}).\n\n"
             "When to use Web Research vs Company Knowledge:\n"
             "- Use 'web_research' ONLY for external, industry, general technical documentation, or public knowledge (e.g. 'What are NVIDIA Nemotron deployment requirements?').\n"
-            "- NEVER use 'web_research' for internal company policies, company departments, leave days, or onboarding. Internal company questions (e.g. 'Who is the head of Engineering?', 'our leave policy') MUST route to 'company_knowledge' or 'memory', NEVER 'web_research'.\n\n"
+            "- NEVER use 'web_research' for internal company policies, company departments, leave days, or onboarding. Internal company questions (e.g. 'Who is the head of Engineering?', 'our leave policy') MUST route to 'company_knowledge' or 'memory', NEVER 'web_research'.\n"
+            "- FOR MIXED QUESTIONS that compare internal company policy with an external public benchmark or statutory standard, generate a multi-step plan containing BOTH tools: first 'company_knowledge' for the internal data, and second 'web_research' for the external benchmark.\n"
+            "  Example Mixed Question: \"How does our annual leave compare to UK statutory minimum?\"\n"
+            "  Example Plan:\n"
+            "  {\n"
+            '    "goal": "Compare internal annual leave policy with UK statutory minimum",\n'
+            '    "steps": [\n'
+            '      {"tool": "company_knowledge", "input": "How many days of annual leave does the company provide?"},\n'
+            '      {"tool": "web_research", "args": {"query": "UK statutory minimum annual leave entitlement", "max_results": 1}}\n'
+            '    ]\n'
+            "  }\n\n"
             "STRICT RULES:\n"
             "1. ONLY use 'company_knowledge', 'memory', or 'web_research'. Never invent tools (e.g. 'execute_sql', 'create_task', 'run_shell' are forbidden).\n"
             "2. NEVER write SQL queries, table names, or code in any parameter.\n"
