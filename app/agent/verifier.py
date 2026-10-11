@@ -83,31 +83,72 @@ class Verifier:
                 "Failed: Answer did not acknowledge missing evidence or hallucinated numbers.",
             ))
         else:
-            # 4. Grounding Check: Numbers/facts in answer must appear in evidence or question
-            # Exclude structural numbered-list markers (e.g. "1.", "2)", markdown list prefixes)
+            # 4. Grounding Check: Numbers/facts in answer must appear in evidence or question,
+            # or be derivable as a difference, absolute difference, sum, or percentage of two numbers
+            # that BOTH appear in the evidence.
             clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
             list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
             list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
 
-            numbers_in_answer = set(re.findall(r"\b\d+\b", clean_ans)) - list_markers
-            evidence_numbers = set()
-            for f in extracted_facts:
-                if f.isdigit():
-                    evidence_numbers.add(f)
-                else:
-                    evidence_numbers.update(re.findall(r"\b\d+\b", str(f)))
-            question_numbers = set(re.findall(r"\b\d+\b", question))
-            allowed_numbers = evidence_numbers.union(question_numbers)
+            raw_tokens = re.findall(r"\b\d+(?:\.\d+)?\b", clean_ans)
+            numbers_in_answer = [n for n in raw_tokens if n not in list_markers]
 
-            unsupported_numbers = numbers_in_answer - allowed_numbers
+            # Extract numbers from evidence (facts)
+            evidence_numeric_values: Set[float] = set()
+            for f in extracted_facts:
+                for m in re.findall(r"\b\d+(?:\.\d+)?\b", str(f)):
+                    try:
+                        evidence_numeric_values.add(float(m))
+                    except ValueError:
+                        pass
+
+            # Extract numbers from question
+            question_numeric_values: Set[float] = set()
+            for m in re.findall(r"\b\d+(?:\.\d+)?\b", question):
+                try:
+                    question_numeric_values.add(float(m))
+                except ValueError:
+                    pass
+
+            unsupported_numbers = []
+            accepted_derived: Dict[str, str] = {}
+
+            for num_str in set(numbers_in_answer):
+                try:
+                    val = float(num_str)
+                except ValueError:
+                    unsupported_numbers.append(num_str)
+                    continue
+
+                # 1. Directly in evidence or question
+                if val in evidence_numeric_values or val in question_numeric_values:
+                    continue
+
+                # 2. Derivable from two numbers that BOTH appear in evidence
+                derivation = self.find_derived_number_explanation(val, evidence_numeric_values)
+                if derivation:
+                    accepted_derived[num_str] = derivation
+                else:
+                    unsupported_numbers.append(num_str)
 
             numbers_grounded = len(unsupported_numbers) == 0
+
+            if numbers_grounded:
+                if accepted_derived:
+                    derived_text = ", ".join(accepted_derived.values())
+                    detail = f"All numbers in answer appear in verified evidence (accepted derived: {derived_text})."
+                else:
+                    detail = "All numbers in answer appear in verified evidence."
+            else:
+                detail = f"Potentially ungrounded numbers found in answer: {sorted(unsupported_numbers)}"
+                if accepted_derived:
+                    derived_text = ", ".join(accepted_derived.values())
+                    detail += f" (accepted derived: {derived_text})"
+
             checks.append(CheckItem(
                 name="evidence_fact_grounding",
                 passed=numbers_grounded,
-                detail="All numbers in answer appear in verified evidence."
-                if numbers_grounded else
-                f"Potentially ungrounded numbers found in answer: {sorted(unsupported_numbers)}",
+                detail=detail,
             ))
 
         # 5. Check: Write confirmation for memory write operations
@@ -258,6 +299,49 @@ class Verifier:
 
         return False, "External web research sources or URLs were not explicitly cited."
 
+    @staticmethod
+    def find_derived_number_explanation(val: float, evidence_numbers: Set[float]) -> Optional[str]:
+        """
+        Determines whether a numeric value equals a difference, absolute difference, sum,
+        or percentage of two numbers that BOTH appear in the evidence.
+        Returns a human-readable explanation (e.g. '4 = 28 - 24') or None.
+        """
+        def _fmt(n: float) -> str:
+            return str(int(n)) if n.is_integer() else str(n)
+
+        nums = sorted(list(evidence_numbers))
+        if len(nums) < 2:
+            return None
+
+        # 1. Percentage check (a / b * 100 where a != b, b > 0)
+        for a in nums:
+            for b in nums:
+                if a == b or b <= 0:
+                    continue
+                pct = (a / b) * 100.0
+                if abs(val - round(pct, 0)) < 1e-4 or abs(val - round(pct, 1)) < 1e-4:
+                    return f"{_fmt(val)}% = ({_fmt(a)} / {_fmt(b)}) * 100"
+
+        # 2. Difference check (a - b where a > b)
+        for a in nums:
+            for b in nums:
+                if a > b and abs(val - (a - b)) < 1e-4:
+                    return f"{_fmt(val)} = {_fmt(a)} - {_fmt(b)}"
+
+        # 3. Sum check (a + b where a != b)
+        for a in nums:
+            for b in nums:
+                if a != b and abs(val - (a + b)) < 1e-4:
+                    return f"{_fmt(val)} = {_fmt(a)} + {_fmt(b)}"
+
+        # 4. Absolute difference fallback |a - b| (where a != b)
+        for a in nums:
+            for b in nums:
+                if a != b and abs(val - abs(a - b)) < 1e-4 and abs(a - b) > 0:
+                    return f"{_fmt(val)} = |{_fmt(a)} - {_fmt(b)}|"
+
+        return None
+
     def verify_web_claims_grounded(
         self,
         answer: str,
@@ -265,7 +349,7 @@ class Verifier:
         allowed_facts: Optional[Set[str]] = None,
         question: str = "",
     ) -> Tuple[bool, str]:
-        """Verifies that numbers and versions in answer are grounded in web snippets or evidence facts."""
+        """Verifies that numbers and versions in answer are grounded in web snippets, evidence facts, or derived."""
         clean_ans = re.sub(r"(?:^|[\r\n\s])(?:\d+[\.\)]|\(\d+\))\s+", " ", answer)
         list_markers = set(re.findall(r"(?:^|[\r\n\s])(\d+)[\.\)]\s+", answer))
         list_markers.update(re.findall(r"(?:^|[\r\n\s])\((\d+)\)\s+", answer))
@@ -277,10 +361,34 @@ class Verifier:
         if question:
             allowed.update(re.findall(r"\b\d+(?:\.\d+)*\b", question))
 
+        # Collect evidence numeric values from allowed_facts and snippets
+        evidence_numeric_values: Set[float] = set()
+        for f in (allowed_facts or set()):
+            for m in re.findall(r"\b\d+(?:\.\d+)?\b", str(f)):
+                try:
+                    evidence_numeric_values.add(float(m))
+                except ValueError:
+                    pass
+        for s in snippets:
+            for m in re.findall(r"\b\d+(?:\.\d+)?\b", str(s)):
+                try:
+                    evidence_numeric_values.add(float(m))
+                except ValueError:
+                    pass
+
         unsupported_claims = set()
         for claim in numbers_and_versions_ans:
             if claim not in allowed and claim not in web_snippets_text:
-                unsupported_claims.add(claim)
+                # Check if claim is derivable from two numbers in evidence
+                is_derived = False
+                try:
+                    val = float(claim)
+                    if self.find_derived_number_explanation(val, evidence_numeric_values) is not None:
+                        is_derived = True
+                except ValueError:
+                    pass
+                if not is_derived:
+                    unsupported_claims.add(claim)
 
         if not unsupported_claims:
             return True, "All numbers and version strings in web-assisted answer are grounded in retrieved snippets."

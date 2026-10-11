@@ -329,6 +329,139 @@ class TestAgentExecutionAndVerification(unittest.TestCase):
         self.assertTrue(grounding_check.passed)
 
 
+class TestDerivedNumbersVerification(unittest.TestCase):
+    """Part 1: Unit tests for derived numbers (difference, sum, percentage, ungrounded failures)."""
+
+    def setUp(self):
+        self.verifier = Verifier()
+
+    def test_derived_difference_passes(self):
+        plan = AgentPlan(
+            goal="Compare leaves",
+            steps=[
+                PlanStep(tool="company_knowledge", input="annual leave"),
+                PlanStep(tool="web_research", args={"query": "UK statutory leave", "max_results": 1}),
+            ]
+        )
+        tool_results = [
+            ToolResult(tool="company_knowledge", success=True, source="sqlite", data=[{"days": 24, "leave_type": "Annual Leave"}]),
+            ToolResult(tool="web_research", success=True, source="tavily", data=[{"title": "UK Gov", "snippet": "UK statutory minimum is 28 days", "url": "https://gov.uk/leave"}]),
+        ]
+        answer = "TechNova offers 24 days while UK statutory is 28 days, a difference of 4 days. Sources: - [UK Gov](https://gov.uk/leave)"
+        res = self.verifier.verify(
+            question="How does our annual leave compare to UK statutory minimum?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer,
+        )
+        self.assertTrue(res.passed, f"Failed: {res.unresolved}")
+        check = next(c for c in res.checks if c.name == "evidence_fact_grounding")
+        self.assertTrue(check.passed)
+        self.assertIn("4 = 28 - 24", check.detail)
+
+    def test_derived_sum_passes(self):
+        plan = AgentPlan(
+            goal="Sum headcount",
+            steps=[PlanStep(tool="company_knowledge", input="AI and Backend headcount")]
+        )
+        tool_results = [
+            ToolResult(
+                tool="company_knowledge",
+                success=True,
+                source="sqlite",
+                data=[{"name": "AI", "employees": 80}, {"name": "Backend", "employees": 120}]
+            ),
+        ]
+        answer = "AI has 80 employees and Backend has 120 employees, for a combined total of 200 employees."
+        res = self.verifier.verify(
+            question="What is the total headcount of AI and Backend?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer,
+        )
+        self.assertTrue(res.passed, f"Failed: {res.unresolved}")
+        check = next(c for c in res.checks if c.name == "evidence_fact_grounding")
+        self.assertTrue(check.passed)
+        self.assertIn("200 = 80 + 120", check.detail)
+
+    def test_percentage_passes(self):
+        plan = AgentPlan(
+            goal="Calculate percentage",
+            steps=[PlanStep(tool="company_knowledge", input="team ratio")]
+        )
+        tool_results = [
+            ToolResult(
+                tool="company_knowledge",
+                success=True,
+                source="sqlite",
+                data=[{"team_a": 20, "total": 50, "ratio_item": 1, "ratio_total": 7}]
+            ),
+        ]
+        answer_0dec = "Team A has 20 out of 50 members, which is 40% of the team."
+        res_0dec = self.verifier.verify(
+            question="What percentage is team A?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer_0dec,
+        )
+        self.assertTrue(res_0dec.passed)
+        check_0dec = next(c for c in res_0dec.checks if c.name == "evidence_fact_grounding")
+        self.assertTrue(check_0dec.passed)
+        self.assertIn("40% = (20 / 50) * 100", check_0dec.detail)
+
+        answer_1dec = "The ratio is 1 out of 7, representing 14.3% of the total."
+        res_1dec = self.verifier.verify(
+            question="What is the ratio percentage?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer_1dec,
+        )
+        self.assertTrue(res_1dec.passed)
+        check_1dec = next(c for c in res_1dec.checks if c.name == "evidence_fact_grounding")
+        self.assertTrue(check_1dec.passed)
+        self.assertIn("14.3% = (1 / 7) * 100", check_1dec.detail)
+
+    def test_non_derivable_number_fails(self):
+        plan = AgentPlan(
+            goal="Check leave",
+            steps=[PlanStep(tool="company_knowledge", input="annual leave")]
+        )
+        tool_results = [
+            ToolResult(tool="company_knowledge", success=True, source="sqlite", data=[{"days": 24}]),
+        ]
+        answer = "TechNova offers 24 days of leave and was founded in 1999 with 99 offices."
+        res = self.verifier.verify(
+            question="How much leave do we get?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer,
+        )
+        self.assertFalse(res.passed)
+        check = next(c for c in res.checks if c.name == "evidence_fact_grounding")
+        self.assertFalse(check.passed)
+        self.assertIn("99", check.detail)
+
+    def test_derivation_where_only_one_operand_in_evidence_fails(self):
+        plan = AgentPlan(
+            goal="Compare leave with question operand",
+            steps=[PlanStep(tool="company_knowledge", input="annual leave")]
+        )
+        tool_results = [
+            ToolResult(tool="company_knowledge", success=True, source="sqlite", data=[{"days": 24}]),
+        ]
+        answer = "TechNova offers 24 days, which is a difference of 4 days."
+        res = self.verifier.verify(
+            question="How does our leave compare to 28 days?",
+            plan=plan,
+            tool_results=tool_results,
+            answer=answer,
+        )
+        self.assertFalse(res.passed)
+        check = next(c for c in res.checks if c.name == "evidence_fact_grounding")
+        self.assertFalse(check.passed)
+        self.assertIn("4", check.detail)
+
+
 class TestAgentEndpoint(unittest.TestCase):
     """Integration tests for the /agent/ask HTTP endpoint using in-memory TestClient."""
 
