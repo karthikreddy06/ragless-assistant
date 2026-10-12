@@ -89,33 +89,63 @@ def validate_task_title(title: str) -> str:
     return clean
 
 
-READ_ONLY_TASK_INQUIRY_PATTERNS = [
-    re.compile(r"\b(?:what\s+(?:is|are)|explain|describe|tell\s+me\s+about)\s+(?:an?\s+)?onboarding\s+tasks?\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+(?:is|are)\s+(?:a\s+)?tasks?\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+tasks?\s+do\s+i\s+have\b", re.IGNORECASE),
-    re.compile(r"^(?:do\s+i\s+(?:need|have)\s+to|should\s+i|must\s+i|am\s+i\s+(?:required|supposed)\s+to|how\s+do\s+i|how\s+to|is\s+it\s+necessary\s+to)\b", re.IGNORECASE),
-    re.compile(r"\b(?:do\s+i\s+need\s+to|should\s+i|do\s+i\s+have\s+to)\s+(?:create|add|set\s*up)\b", re.IGNORECASE),
-]
+INTERROGATIVE_MODAL_PATTERN = re.compile(
+    r"\b(?:do|does|did|should|can|could|what|how|why|is|are|must)\b",
+    re.IGNORECASE,
+)
+
+ONBOARDING_TASKS_VERB_PATTERN = re.compile(
+    r"\b(?:create|add|set\s*up|populate|generate)\b",
+    re.IGNORECASE,
+)
+
+CREATE_TASK_VERB_PATTERN = re.compile(
+    r"\b(?:create|add|new)\b",
+    re.IGNORECASE,
+)
+
+COMPLETE_TASK_VERB_PATTERN = re.compile(
+    r"\b(?:complete|finish|mark|completed|finished)\b",
+    re.IGNORECASE,
+)
+
+
+def check_imperative_write_intent(text: str, verb_pattern: re.Pattern) -> bool:
+    """
+    Enforces that write intent requires imperative phrasing:
+    1. Any text containing '?' is rejected.
+    2. Any text starting with or containing an interrogative/modal
+       (do, should, can, could, what, how, why, is, are, must) before the action verb is rejected.
+    """
+    if not text:
+        return False
+    if "?" in text:
+        return False
+
+    match = verb_pattern.search(text)
+    if not match:
+        return False
+
+    prefix = text[: match.start()]
+    if INTERROGATIVE_MODAL_PATTERN.search(prefix):
+        return False
+
+    return True
 
 
 def validate_onboarding_tasks_intent(question: Optional[str]) -> bool:
     """
     Validates explicit intent to create onboarding tasks.
     Must clearly ask to create/add/set up onboarding tasks.
-    Read-only inquiries, definitions, or questions about necessity (e.g. 'Do I need to create tasks for onboarding?',
-    'What are onboarding tasks?') return False.
+    Write intent requires imperative phrasing: any text containing '?' or containing
+    an interrogative/modal (do, should, can, could, what, how, why, is, are, must)
+    before the action verb is rejected.
     """
     if not question:
         return False
     q = question.strip()
-    q_lower = q.lower()
 
-    # Reject informational inquiries, definitions, and questions of obligation/necessity
-    for pat in READ_ONLY_TASK_INQUIRY_PATTERNS:
-        if pat.search(q):
-            return False
-
-    if q_lower.startswith(("what is a task", "what are tasks", "what tasks do i have", "what are onboarding tasks")):
+    if not check_imperative_write_intent(q, ONBOARDING_TASKS_VERB_PATTERN):
         return False
 
     return bool(ONBOARDING_TASKS_CREATE_INTENT_PATTERN.search(q))
@@ -124,17 +154,17 @@ def validate_onboarding_tasks_intent(question: Optional[str]) -> bool:
 def validate_create_task_intent(question: Optional[str], title: str) -> bool:
     """
     Validates explicit intent to create an individual task:
-    1. Question must explicitly state 'create/add a task ...'.
-    2. The title must appear verbatim (case-insensitive) in the user text.
-    3. Read-only questions return False.
+    1. Write intent requires imperative phrasing: any text containing '?' or
+       starting with an interrogative/modal before the verb is rejected.
+    2. Question must explicitly state 'create/add a task ...'.
+    3. The title must appear verbatim (case-insensitive) in the user text.
     """
     if not question or not title:
         return False
     q = question.strip()
     q_lower = q.lower()
 
-    # Read-only rejection
-    if re.search(r"\bwhat\s+is\s+a\s+task\b", q_lower) or re.search(r"\bwhat\s+tasks?\s+do\s+i\s+have\b", q_lower):
+    if not check_imperative_write_intent(q, CREATE_TASK_VERB_PATTERN):
         return False
 
     if not CREATE_TASK_INTENT_PATTERN.search(q):
@@ -154,17 +184,16 @@ def validate_complete_task_intent(
 ) -> bool:
     """
     Validates explicit intent to complete a task:
-    1. Question must have explicit completion phrasing.
-    2. The task must match the user's text by id or title keywords.
-    3. Read-only questions return False.
+    1. Write intent requires imperative phrasing: any text containing '?' or
+       starting with an interrogative/modal before the verb is rejected.
+    2. Question must have explicit completion phrasing.
+    3. The task must match the user's text by id or title keywords.
     """
     if not question or not task_id:
         return False
     q = question.strip()
-    q_lower = q.lower()
 
-    # Read-only check
-    if re.search(r"\bwhat\s+is\s+a\s+task\b", q_lower) or re.search(r"\bwhat\s+tasks?\s+do\s+i\s+have\b", q_lower):
+    if not check_imperative_write_intent(q, COMPLETE_TASK_VERB_PATTERN):
         return False
 
     if not COMPLETE_TASK_INTENT_PATTERN.search(q):
@@ -180,6 +209,7 @@ def validate_complete_task_intent(
             w for w in re.findall(r"\b[a-zA-Z]{3,}\b", task_title.lower())
             if w not in TITLE_STOP_WORDS
         ]
+        q_lower = q.lower()
         if title_words and any(w in q_lower for w in title_words):
             return True
 

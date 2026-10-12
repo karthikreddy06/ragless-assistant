@@ -280,12 +280,16 @@ class TestTaskSecurityAndIntent(unittest.TestCase):
         self.assertEqual(all_tasks["count"], 0)
 
     def test_near_miss_onboarding_task_phrasings_do_not_write(self):
-        """Near-miss questions like 'Do I need to create tasks for onboarding?' or 'What are onboarding tasks?' must NOT write."""
+        """Near-miss questions like 'Do I need to create tasks for onboarding?' or prefixed questions must NOT write."""
         near_misses = [
+            "Please tell me, do I need to create tasks for onboarding?",
             "Do I need to create tasks for onboarding?",
             "What are onboarding tasks?",
             "Should I create tasks for onboarding?",
             "Can you explain onboarding tasks?",
+            "Can you create tasks for onboarding?",
+            "How do I create tasks for onboarding?",
+            "Please tell me, should I create tasks for onboarding",
         ]
         step_onboarding = PlanStep(tool="tasks", operation="create_tasks_from_onboarding", args={})
         for q in near_misses:
@@ -297,12 +301,58 @@ class TestTaskSecurityAndIntent(unittest.TestCase):
             self.assertFalse(res.success, f"Expected execute to fail for near-miss query '{q}'")
             self.assertIn("only permitted when user text explicitly requests", res.error)
 
-        # Confirm legitimate command passes intent validator and execution
-        legit_query = "Create tasks for my first-week onboarding"
-        self.assertTrue(validate_onboarding_tasks_intent(legit_query))
-        res_legit = self.executor.execute(step_onboarding, user_id="near-miss-user", question=legit_query)
+        # Confirm all 4 target legitimate commands pass intent validator and execution
+        legit_queries = [
+            "Create tasks for my first-week onboarding",
+            "Create tasks for my onboarding",
+            "Add my onboarding tasks",
+            "Create tasks for onboarding",
+        ]
+        for legit_query in legit_queries:
+            self.assertTrue(validate_onboarding_tasks_intent(legit_query), f"Failed for '{legit_query}'")
+
+        res_legit = self.executor.execute(step_onboarding, user_id="near-miss-user", question=legit_queries[0])
         self.assertTrue(res_legit.success)
         self.assertTrue(res_legit.data["write_confirmed"])
+
+    def test_near_miss_create_and_complete_task_phrasings_do_not_write(self):
+        """Near-miss questions for create_task and complete_task must NOT write."""
+        # 1. create_task near-misses
+        create_near_misses = [
+            "Please tell me, do I need to create a task to submit taxes?",
+            "Can you create a task to submit taxes?",
+            "Can you create a task to submit taxes",
+            "Should I create a task to submit taxes?",
+            "How do I create a task to submit taxes?",
+        ]
+        step_create = PlanStep(tool="tasks", operation="create_task", args={"title": "submit taxes"})
+        for q in create_near_misses:
+            self.assertFalse(
+                validate_create_task_intent(q, "submit taxes"),
+                f"validate_create_task_intent should return False for '{q}'",
+            )
+            res = self.executor.execute(step_create, user_id="near-miss-user-2", question=q)
+            self.assertFalse(res.success)
+            self.assertIn("only permitted when user explicitly requests adding a task", res.error)
+
+        # 2. complete_task near-misses
+        complete_near_misses = [
+            "Please tell me, should I complete task 1?",
+            "Could you mark task 1 as done?",
+            "Could you mark task 1 as done",
+            "Can I complete task 1?",
+            "Is task 1 completed?",
+            "What tasks should I complete?",
+        ]
+        step_complete = PlanStep(tool="tasks", operation="complete_task", args={"task_id": 1})
+        for q in complete_near_misses:
+            self.assertFalse(
+                validate_complete_task_intent(q, 1),
+                f"validate_complete_task_intent should return False for '{q}'",
+            )
+            res = self.executor.execute(step_complete, user_id="near-miss-user-2", question=q)
+            self.assertFalse(res.success)
+            self.assertIn("only permitted when user explicitly requests completing", res.error)
 
     def test_title_not_in_user_text_rejected(self):
         """create_task title must appear verbatim (case-insensitive) in the user text."""

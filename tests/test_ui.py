@@ -103,5 +103,31 @@ class TestWebUIEndpoint(unittest.TestCase):
         self.assertNotIn("<script>", escaped)
 
 
+    def test_mock_data_badge_present_in_ui_assets(self):
+        """UI files must contain the 'MOCK DATA' badge element, styling, and logic when tool_result source is 'mock'."""
+        static_dir = Path(__file__).resolve().parent.parent / "app" / "static"
+        html_path = static_dir / "index.html"
+        css_path = static_dir / "styles.css"
+        js_path = static_dir / "app.js"
+
+        # 1. HTML contains the evidence panel mock badge element
+        with open(html_path, "r", encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn('id="evidence-mock-badge"', html)
+        self.assertIn("MOCK DATA", html)
+
+        # 2. CSS contains .badge-mock styles
+        with open(css_path, "r", encoding="utf-8") as f:
+            css = f.read()
+        self.assertIn(".badge-mock", css)
+
+        # 3. JavaScript contains mock source detection and badge creation
+        with open(js_path, "r", encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn('tr.source === "mock"', js)
+        self.assertIn('"MOCK DATA"', js)
+        self.assertIn("evidenceMockBadge", js)
+
+
 if __name__ == "__main__":
     unittest.main()

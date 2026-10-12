@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const evidencePanel = document.getElementById("evidence-panel");
   const evidenceCount = document.getElementById("evidence-count");
+  const evidenceMockBadge = document.getElementById("evidence-mock-badge");
   const sourcesList = document.getElementById("sources-list");
   const internalEvidence = document.getElementById("internal-evidence");
 
@@ -338,6 +339,13 @@ document.addEventListener("DOMContentLoaded", () => {
       stepHeader.appendChild(sourceSpan);
       stepHeader.appendChild(statusBadge);
 
+      if (tr.source === "mock") {
+        const mockBadge = document.createElement("span");
+        mockBadge.className = "badge badge-mock";
+        mockBadge.textContent = "MOCK DATA";
+        stepHeader.appendChild(mockBadge);
+      }
+
       const stepDesc = document.createElement("p");
       stepDesc.className = "step-desc";
       const descText = step.operation
@@ -400,6 +408,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const totalEvidenceCount = sources.length + internalItems.length;
     evidenceCount.textContent = `${totalEvidenceCount} items`;
+
+    const hasMockSource = toolResults.some((tr) => tr.source === "mock");
+    if (evidenceMockBadge) {
+      if (hasMockSource) {
+        evidenceMockBadge.classList.remove("hidden");
+      } else {
+        evidenceMockBadge.classList.add("hidden");
+      }
+    }
 
     // Clear sources list
     while (sourcesList.firstChild) {

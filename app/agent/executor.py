@@ -68,11 +68,11 @@ def execute_web_research(
     Source label is 'tavily' only when a real TavilyClient is active; 'mock' for fake/offline clients.
     """
     search_client = client or get_web_search_client()
-    is_real_tavily = (
-        isinstance(search_client, TavilyClient)
-        and search_client.is_available()
-    )
-    src_label = "tavily" if is_real_tavily else "mock"
+    if isinstance(search_client, TavilyClient):
+        is_avail = search_client.is_available if isinstance(search_client.is_available, bool) else bool(search_client.is_available())
+        src_label = "tavily" if is_avail else "unavailable"
+    else:
+        src_label = "mock"
 
     if call_count >= max_calls:
         logger.warning("Per-request web search limit (%d) exceeded.", max_calls)

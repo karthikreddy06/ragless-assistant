@@ -195,6 +195,7 @@ Tested across 3 repetitions against local Ollama (`qwen2.5:3b`) on identical mul
 > **Scope of 100% Benchmark Result & Catalog Guidance**:
 > 1. **Checklist Catalog in Planner Prompt**: The planner system prompt dynamically includes the active onboarding checklist catalog (`Available Onboarding Checklist Items Catalog: Item ID X: <Title>`) queried from SQLite. This context allows the local `qwen2.5:3b` model to accurately select the correct integer item ID (e.g. ID 128 for Security Training) rather than hallucinating random numbers.
 > 2. **Demo Scenario Scope**: The **100% plan validity and correctness results are measured specifically for the target demo scenario** (Day 1 onboarding inquiry → Day 2 security training completion → Day 3 remaining tasks inquiry). While this validates the core architecture and memory lifecycle, it does not imply 100% success across arbitrary or out-of-distribution user requests without fast-path support.
+> 3. **Demo-Scenario Accuracy Scope for Few-Shot / Descriptions**: Few-shot examples and tool-description prompt guidance reflect demo-scenario accuracy only. Out-of-distribution phrasings have lower unguided LLM accuracy, and production reliability relies on deterministic fast-path routing and Python executor guardrails rather than unguided prompt compliance.
 
 ### 7.3 Coverage Analysis: Fast-Path vs. LLM Planner
 - **What Fast-Path Covers**: High-frequency, well-patterned operational intents:

@@ -490,6 +490,14 @@ body {
   color: var(--text-muted);
 }
 
+.badge-mock {
+  background-color: var(--warning-subtle);
+  color: var(--warning-text);
+  border: 1px solid var(--warning);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .unresolved-box {
   margin-top: 1rem;
   padding: 0.75rem 1rem;

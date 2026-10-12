@@ -819,6 +819,30 @@ class TestWebResearchOrchestratorEndToEnd(unittest.TestCase):
             "Security violation: memory write prohibited after web content has entered the execution run (taint rule)."
         )
 
+    def test_unset_tavily_key_returns_unavailable_result_never_fake_client(self):
+        """When TAVILY_API_KEY is unset, get_web_search_client() returns TavilyClient, searching returns 'unavailable', never FakeWebSearchClient or canned data."""
+        with patch.dict(os.environ, {"TAVILY_API_KEY": ""}):
+            from app.agent.web_search import get_web_search_client, TavilyClient, FakeWebSearchClient
+            client = get_web_search_client()
+            self.assertIsInstance(client, TavilyClient)
+            self.assertNotIsInstance(client, FakeWebSearchClient)
+            self.assertFalse(client.is_available)
+
+            res = client.search(query="hardware requirements for NVIDIA Nemotron-3")
+            self.assertFalse(res.get("success"))
+            self.assertEqual(res.get("error"), "web research unavailable")
+            self.assertEqual(res.get("results"), [])
+            self.assertEqual(res.get("sources"), [])
+
+            # Also check executor execution
+            executor = ToolExecutor(memory_store=self.memory_store)
+            step = PlanStep(tool="web_research", args={"query": "Nemotron deployment"})
+            exec_res = executor.execute_step(step, user_id="test-user")
+            self.assertFalse(exec_res.success)
+            self.assertEqual(exec_res.source, "unavailable")
+            self.assertIsNone(exec_res.data)
+            self.assertEqual(exec_res.error, "web research unavailable")
+
 
 if __name__ == "__main__":
     unittest.main()

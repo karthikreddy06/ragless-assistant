@@ -52,6 +52,10 @@ Task write operations cannot be triggered by LLM planning alone; they are strict
 - `create_task`: Only permitted on explicit "create/add a task ..." phrasing, AND the title must appear verbatim (case-insensitive) in the user text.
 - `complete_task`: Only permitted on explicit completion phrasing, AND the task must match the user text by ID or title keywords.
 - Read-only inquiries (e.g. "what tasks do I have?", "what is a task?") cause zero writes across all write operations.
+- Interrogative and near-miss phrasings (prefixed questions, "do I need to...", "can you...", "?") are deterministically rejected in Python before any write occurs.
+
+### 4.1 Demo-Scenario Accuracy Scope
+Few-shot examples in the planner prompt and tool descriptions guide model tool selection for targeted demonstration workflows (e.g., "Create tasks for my first-week onboarding"). These prompt-guided planning results reflect demo-scenario accuracy only. Real-world and out-of-distribution prompts cannot rely on unguided LLM prompt compliance; operational integrity and safety depend on deterministic Python-level intent validation and fast-path routing.
 
 ## 5. Security & Taint Enforcement
 - **Taint Rule**: If web content enters an execution run (via `web_research`), all subsequent task writes (`create_tasks_from_onboarding`, `create_task`, `complete_task`) are immediately rejected with a clean security violation error.
