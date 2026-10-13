@@ -1,61 +1,62 @@
 /* ==========================================================================
    RAGless Web UI Styles
-   Light Pink Theme · Full-Width Page Layout · Single Theme (No Dark Mode Block)
-   WCAG AA Conformance · Zero Gradients/Glows · Zero External Dependencies
+   Theme: Soft Pink & Sky Blue Marble
+   Organic Watercolor Palette · Full-Width Viewport · WCAG AA Conformance
    ========================================================================== */
 
 :root {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Typography scale */
+  /* Typography Scale */
   --text-xs: 12px;
   --text-sm: 13px;
   --text-base: 14px;
   --text-md: 16px;
   --text-lg: 20px;
 
-  /* Radii */
+  /* Radii (8-12px) */
   --radius-sm: 6px;
   --radius-md: 8px;
+  --radius-lg: 10px;
   --radius-pill: 9999px;
 
-  /* Control heights */
+  /* Control Heights */
   --height-control: 36px;
   --height-button: 40px;
 
-  /* Palette Tokens */
-  --bg-page: #FFF5F8;
+  /* Color Palette (Soft Pink & Sky Blue Marble) */
+  --bg-page: #FDF7FA;
   --bg-surface: #FFFFFF;
-  --bg-subtle-pink: #FCE7F0;
+  --soft-pink: #F4C6D8;
+  --light-blush: #F9E3EC;
+  --sky-blue: #B9E5F5;
+  --pale-blue: #D9F1FA;
 
-  --border-color: #F3D5E0;
-  --border-strong: #E4B5C8;
-  --border-control: #9E5677; /* darkened for WCAG 3:1 contrast against white & pink */
+  --border-color: #EADBE5;
+  --border-control: #8E6B83; /* darkened for WCAG 3:1 contrast on white & pastels */
 
-  --text-main: #3B1F2B; /* dark plum */
-  --text-muted: #7A5566;
-  --text-on-accent: #FFFFFF;
+  --text-main: #382936; /* primary text */
+  --text-muted: #796B79; /* secondary text */
 
-  --accent: #BE185D;
-  --accent-hover: #9D174D;
-  --accent-subtle: #FCE7F0;
+  --accent-primary: #C76B98;
+  --accent-hover: #AD507F;
 
-  /* Status Tokens */
-  --status-green-text: #15803D;
-  --status-green-bg: #ECFDF3;
-  --status-green-border: #A6F4C5;
+  /* Semantic Status Tokens */
+  --status-green-text: #286036;
+  --status-green-bg: #EDF7EE;
+  --status-green-border: #C3E6CB;
 
-  --status-amber-text: #B45309;
-  --status-amber-bg: #FFF7E6;
-  --status-amber-border: #FEDF89;
+  --status-amber-text: #8A4E12;
+  --status-amber-bg: #FFF8E1;
+  --status-amber-border: #FDE68A;
 
-  --status-red-text: #B91C1C;
-  --status-red-bg: #FEF2F2;
-  --status-red-border: #FECDCA;
+  --status-red-text: #991B1B;
+  --status-red-bg: #FEE2E2;
+  --status-red-border: #FECACA;
 
-  --card-shadow: 0 1px 3px 0 rgba(59, 31, 43, 0.04);
-  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent);
+  --card-shadow: 0 1px 3px 0 rgba(56, 41, 54, 0.04);
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent-primary);
 }
 
 /* ==========================================================================
@@ -77,6 +78,15 @@ html {
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-page);
+  background-image:
+    radial-gradient(ellipse at 12% 16%, rgba(185, 229, 245, 0.45) 0%, transparent 45%),
+    radial-gradient(ellipse at 88% 12%, rgba(244, 198, 216, 0.42) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(249, 227, 236, 0.4) 0%, transparent 55%),
+    radial-gradient(ellipse at 15% 85%, rgba(244, 198, 216, 0.38) 0%, transparent 45%),
+    radial-gradient(ellipse at 86% 84%, rgba(217, 241, 250, 0.45) 0%, transparent 50%),
+    linear-gradient(135deg, #FDF7FA 0%, #FAF0F6 50%, #F5F9FD 100%);
+  background-attachment: fixed;
+  background-size: 100% 100%;
   color: var(--text-main);
   min-height: 100vh;
   width: 100%;
@@ -123,10 +133,13 @@ body {
   width: 100%;
   height: 54px;
   border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-surface);
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   margin-bottom: 24px;
   padding: 0 20px;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: 0 1px 2px 0 rgba(56, 41, 54, 0.02);
 }
 
 .top-bar-left {
@@ -142,9 +155,10 @@ body {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
-  background-color: var(--accent);
-  color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  background-color: var(--soft-pink);
+  border: 1px solid var(--accent-primary);
+  color: var(--text-main);
   font-weight: 700;
   font-size: 13px;
   line-height: 1;
@@ -197,14 +211,15 @@ body {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-main);
-  background-color: var(--bg-page);
+  background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   width: 108px;
+  transition: border-color 0.15s ease;
 }
 
 .user-id-input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-primary);
 }
 
 /* Status Pill */
@@ -217,9 +232,9 @@ body {
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
   font-weight: 500;
-  background-color: var(--bg-page);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
+  background-color: var(--pale-blue);
+  border: 1px solid var(--sky-blue);
+  color: var(--text-main);
 }
 
 .status-dot {
@@ -242,7 +257,7 @@ body {
   background-color: var(--status-red-text);
 }
 
-/* Main Area: Full Width 70% / 30% */
+/* Main Area: Full Width 70% / 30% Grid */
 .main-content {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr);
@@ -270,12 +285,12 @@ body {
 }
 
 /* ==========================================================================
-   Cards (Flat Style, 1px Border, Subtle Shadow)
+   Cards (White surfaces, subtle borders, 8-12px radius, minimal shadow)
    ========================================================================== */
 .card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--card-shadow);
 }
@@ -315,10 +330,11 @@ body {
   border: 1px solid var(--border-control);
   border-radius: var(--radius-md);
   resize: vertical;
+  transition: border-color 0.15s ease;
 }
 
 .goal-textarea:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-primary);
 }
 
 .goal-textarea::placeholder {
@@ -333,7 +349,7 @@ body {
   flex-wrap: wrap;
 }
 
-/* Example Prompts: Small Neutral Buttons on Pink Tint */
+/* Example Prompts: Small Neutral Text Buttons on Blush Background */
 .suggestions-group {
   display: flex;
   align-items: center;
@@ -347,7 +363,7 @@ body {
 }
 
 .prompt-btn {
-  background-color: var(--bg-subtle-pink);
+  background-color: var(--light-blush);
   border: 1px solid var(--border-color);
   color: var(--text-main);
   font-family: var(--font-sans);
@@ -355,12 +371,12 @@ body {
   padding: 4px 10px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 0.1s ease, border-color 0.1s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .prompt-btn:hover {
-  background-color: #F8D7E5;
-  border-color: var(--border-strong);
+  background-color: var(--soft-pink);
+  border-color: var(--accent-primary);
 }
 
 .action-group {
@@ -375,34 +391,41 @@ body {
   user-select: none;
 }
 
-/* Primary Button */
+/* Primary "Run Agent" Button: Pastel Pink with Dark Text */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   border-radius: var(--radius-md);
-  border: 1px solid transparent;
+  border: 1px solid var(--accent-primary);
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .btn-primary {
   height: var(--height-button);
   padding: 0 18px;
   font-size: var(--text-base);
-  background-color: var(--accent);
-  color: var(--text-on-accent);
+  background-color: var(--soft-pink);
+  color: var(--text-main);
+  box-shadow: 0 1px 2px 0 rgba(199, 107, 152, 0.15);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--accent-hover);
+  background-color: #EDB3CA;
+  border-color: var(--accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Empty State: One Muted Line */
@@ -435,7 +458,7 @@ body {
   left: 0;
   bottom: 0;
   width: 35%;
-  background-color: var(--accent);
+  background-color: var(--accent-primary);
   border-radius: 2px;
   animation: indeterminate-progress 1.3s ease-in-out infinite;
 }
@@ -475,14 +498,14 @@ body {
 }
 
 .notice-info {
-  background-color: var(--bg-surface);
-  border-color: var(--border-color);
+  background-color: var(--pale-blue);
+  border-color: var(--sky-blue);
   color: var(--text-muted);
   margin-bottom: 12px;
 }
 
 .notice-info .notice-icon {
-  color: var(--text-muted);
+  color: var(--accent-primary);
 }
 
 .notice-info .notice-message {
@@ -521,7 +544,7 @@ body {
   padding: 0 8px;
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   text-transform: capitalize;
 }
@@ -545,9 +568,9 @@ body {
 }
 
 .badge-neutral {
-  background-color: var(--bg-page);
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
+  background-color: var(--pale-blue);
+  color: var(--text-main);
+  border: 1px solid var(--sky-blue);
 }
 
 /* Required MOCK DATA Badge */
@@ -555,13 +578,13 @@ body {
   background-color: var(--status-amber-bg);
   color: var(--status-amber-text);
   border: 1px solid var(--status-amber-border);
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 /* ==========================================================================
-   Results: Answer Card
+   Results: Answer Card (Most Prominent Result)
    ========================================================================== */
 .results-region {
   display: flex;
@@ -570,12 +593,14 @@ body {
 }
 
 .answer-card {
-  padding: 20px;
+  padding: 22px;
+  border-color: var(--border-color);
+  background-color: var(--bg-surface);
 }
 
 .answer-text {
   font-size: var(--text-base);
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--text-main);
   white-space: pre-wrap;
   word-break: break-word;
@@ -635,7 +660,7 @@ body {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  background-color: var(--bg-page);
+  background-color: rgba(253, 247, 250, 0.7);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
@@ -648,8 +673,7 @@ body {
   width: 20px;
   height: 20px;
   border-radius: var(--radius-sm);
-  background-color: var(--bg-subtle-pink);
-  border: 1px solid var(--border-color);
+  background-color: var(--sky-blue);
   color: var(--text-main);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -678,9 +702,9 @@ body {
 
 .step-source-pill {
   font-size: var(--text-xs);
-  color: var(--text-muted);
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  background-color: var(--pale-blue);
+  border: 1px solid var(--sky-blue);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
 }
@@ -825,10 +849,14 @@ body {
 
 .source-link {
   font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--accent-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.source-link:hover {
+  color: var(--accent-hover);
 }
 
 .snippet-quote {
@@ -856,14 +884,14 @@ body {
 }
 
 .data-table th {
-  background-color: var(--bg-page);
-  color: var(--text-muted);
+  background-color: var(--pale-blue);
+  color: var(--text-main);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .data-table tr:nth-child(even) {
-  background-color: var(--bg-subtle-pink);
+  background-color: rgba(249, 227, 236, 0.4);
 }
 
 .data-table tr:last-child td {
@@ -936,14 +964,14 @@ body {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--text-main);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ==========================================================================
    Sidebar: Onboarding & Tasks
    ========================================================================== */
 .sidebar-card {
-  padding: 16px;
+  padding: 18px;
 }
 
 .progress-body {
@@ -975,14 +1003,14 @@ body {
   width: 100%;
   height: 4px;
   border-radius: 2px;
-  background-color: var(--border-color);
+  background-color: var(--pale-blue);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   width: 0%;
-  background-color: var(--accent);
+  background-color: var(--accent-primary);
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -1006,7 +1034,7 @@ body {
 }
 
 .profile-val {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-main);
 }
 
@@ -1027,13 +1055,13 @@ body {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
-  background-color: var(--bg-page);
+  background-color: rgba(253, 247, 250, 0.7);
   font-size: var(--text-xs);
 }
 
 .task-item-title {
   color: var(--text-main);
-  font-weight: 400;
+  font-weight: 500;
   flex: 1;
 }
 

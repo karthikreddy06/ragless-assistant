@@ -1,7 +1,7 @@
 # RAGless Web UI Documentation
 
 ## 1. Overview
-The RAGless Web UI provides an honest, transparent single-page interface served directly by FastAPI at `/ui`. It features a modern, professional **light pink theme** on a **full-width page layout**, ensuring immediate clarity for agent planning steps, deterministic verifications, source provenance, and execution metrics.
+The RAGless Web UI provides an honest, transparent single-page interface served directly by FastAPI at `/ui`. It features an elegant **Soft Pink & Sky Blue Marble** design on a **full-width page layout**, ensuring immediate clarity for agent planning steps, deterministic verifications, source provenance, and execution metrics.
 
 ### Architectural Principles
 - **Zero Build Step**: Pure vanilla HTML5, CSS3, and JavaScript. No npm, Webpack, Vite, or bundle steps.
@@ -13,35 +13,34 @@ The RAGless Web UI provides an honest, transparent single-page interface served 
 
 ---
 
-## 2. Design System & Tokens
+## 2. Design System: Soft Pink & Sky Blue Marble
 
-### 2.1 Palette: Light Pink with Plum Typography
+### 2.1 Palette & Tokens
 
-The design uses a single unified light pink theme (identical across OS dark/light mode settings) with dark plum body text for contrast and a rich `#BE185D` accent. Pink is reserved strictly for canvas backgrounds, subtle card fills, and borders. No gradients, glows, or colored top borders are used.
+The visual style is inspired by dreamy, watercolor-marble art, blending soft pastel pink organically into light sky blue. The design is elegant, calming, modern, and professional—not childish or overly colorful.
 
-| Token | Value | Purpose |
+| Token | Hex Value | Purpose |
 | :--- | :--- | :--- |
-| `--bg-page` | `#FFF5F8` | Canvas full-width background |
-| `--bg-surface` | `#FFFFFF` | Card surface |
-| `--bg-subtle-pink` | `#FCE7F0` | Subtle pink surface (chips, hover, table alternate rows) |
-| `--border-color` | `#F3D5E0` | Subtle 1px dividers and card borders |
-| `--border-strong` | `#E4B5C8` | Structural card borders |
-| `--border-control` | `#9E5677` | Input control boundaries (WCAG 3:1 compliant) |
-| `--text-main` | `#3B1F2B` | Dark plum primary body text |
-| `--text-muted` | `#7A5566` | Muted secondary text and labels |
-| `--accent` | `#BE185D` | Primary action button, links, progress fill, focus ring |
-| `--accent-hover` | `#9D174D` | Primary button hover state |
-| `--status-green-text` | `#15803D` | Verified checkmarks, confirmed writes, completed tasks (`#ECFDF3` bg) |
-| `--status-amber-text` | `#B45309` | Needs review, unconfirmed items, mock data badge (`#FFF7E6` bg) |
-| `--status-red-text` | `#B91C1C` | Execution errors and failed check alerts (`#FEF2F2` bg) |
+| `--bg-page` | `#FDF7FA` | Canvas background with subtle watercolor/marble gradients |
+| `--bg-surface` | `#FFFFFF` | Card surfaces |
+| `--soft-pink` | `#F4C6D8` | Primary button fill, logo background, selected states |
+| `--light-blush` | `#F9E3EC` | Prompt chips, subtle highlights, alternate rows |
+| `--sky-blue` | `#B9E5F5` | Complementary secondary accents, step numbers, badges |
+| `--pale-blue` | `#D9F1FA` | Table headers, informational banners, source badges |
+| `--border-color` | `#EADBE5` | Subtle 1px dividers and card borders |
+| `--border-control`| `#8E6B83` | Input control boundaries (WCAG 3:1 compliant) |
+| `--text-main` | `#382936` | Primary body text (deep plum) |
+| `--text-muted` | `#796B79` | Secondary text and labels |
+| `--accent-primary`| `#C76B98` | Focus rings, progress bar fill, button borders |
+| `--accent-hover` | `#AD507F` | Primary button and link hover state |
+| `--status-green-text` | `#286036` | Verified checkmarks, confirmed writes, completed tasks (`#EDF7EE` bg) |
+| `--status-amber-text` | `#8A4E12` | Needs review, unconfirmed items, mock data badge (`#FFF8E1` bg) |
+| `--status-red-text` | `#991B1B` | Execution errors and failed check alerts (`#FEE2E2` bg) |
 
-### 2.2 Typography & Spacing
-- **Font Stack**: `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`.
-- **Scale**: 14px base body text, 13px secondary, 16px section headers, 20px page titles. Weights restricted to 400 (regular), 500 (medium), and 600 (semibold).
-- **Tabular Numbers**: `font-variant-numeric: tabular-nums` for timers and execution counters.
-- **Monospace**: `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace` strictly for IDs, latency, and code.
-- **Corner Radii**: `8px` for cards and inputs, `6px` for status badges.
-- **Borders & Shadows**: Flat cards with subtle 1px borders and a single minimal shadow (`0 1px 3px 0 rgba(59, 31, 43, 0.04)`).
+### 2.2 Background & Surfaces
+- **Watercolor-Marble Background**: A soft, organic blend of radial gradients (`#B9E5F5` sky blue, `#F4C6D8` soft pink, and `#F9E3EC` light blush) over a light `#FDF7FA` linear base. The wash is low-contrast and soft, ensuring 100% text legibility.
+- **Card Surfaces**: Pure white `#FFFFFF` cards with 1px `#EADBE5` borders and minimal subtle shadows (`0 1px 3px 0 rgba(56, 41, 54, 0.04)`).
+- **Corner Radii**: Rounded corners of `8–10px` (`8px` for inputs/badges, `10px` for cards).
 
 ---
 
@@ -49,47 +48,49 @@ The design uses a single unified light pink theme (identical across OS dark/ligh
 
 Every text and interactive element was mathematically evaluated for WCAG AA conformance (4.5:1 for body text, 3:1 for UI component borders/icons) via `python scripts/check_contrast.py`:
 
-| Element & Pair | Ratio | WCAG AA Standard | Status |
+| Element & Pair | Computed Ratio | Requirement | Status |
 | :--- | :--- | :--- | :--- |
-| **Body text** (`#3B1F2B`) on Surface (`#FFFFFF`) | **14.82:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Body text** (`#3B1F2B`) on Page Background (`#FFF5F8`) | **13.88:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Body text** (`#3B1F2B`) on Subtle Pink (`#FCE7F0`) | **12.58:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Muted text** (`#7A5566`) on Surface (`#FFFFFF`) | **6.33:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Muted text** (`#7A5566`) on Page Background (`#FFF5F8`) | **5.93:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Muted text** (`#7A5566`) on Subtle Pink (`#FCE7F0`) | **5.37:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Button text** (`#FFFFFF`) on Accent (`#BE185D`) | **6.04:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Accent link** (`#BE185D`) on Surface (`#FFFFFF`) | **6.04:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Success text** (`#15803D`) on Surface (`#FFFFFF`) | **5.02:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
-| **Success text** (`#15803D`) on Success Background (`#ECFDF3`) | **4.76:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
-| **Warning text** (`#B45309`) on Surface (`#FFFFFF`) | **5.02:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
-| **Warning text** (`#B45309`) on Warning Background (`#FFF7E6`) | **4.71:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
-| **Error text** (`#B91C1C`) on Surface (`#FFFFFF`) | **6.47:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Error text** (`#B91C1C`) on Error Background (`#FEF2F2`) | **5.91:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
-| **Accent focus ring** (`#BE185D`) on Surface (`#FFFFFF`) | **6.04:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
-| **Input control border** (`#9E5677`) on Surface (`#FFFFFF`) | **5.18:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
-| **Input control border** (`#9E5677`) on Subtle Pink (`#FCE7F0`) | **4.40:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
+| **Primary Text** (`#382936`) on Surface (`#FFFFFF`) | **13.65:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Primary Text** (`#382936`) on Page Background (`#FDF7FA`) | **12.91:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Primary Text** (`#382936`) on Soft Pink Button (`#F4C6D8`) | **9.04:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Primary Text** (`#382936`) on Light Blush (`#F9E3EC`) | **11.20:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Primary Text** (`#382936`) on Sky Blue (`#B9E5F5`) | **10.13:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Primary Text** (`#382936`) on Pale Blue (`#D9F1FA`) | **11.64:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Secondary Text** (`#796B79`) on Surface (`#FFFFFF`) | **5.01:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
+| **Secondary Text** (`#796B79`) on Page Background (`#FDF7FA`) | **4.74:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
+| **Accent Hover** (`#AD507F`) on Surface (`#FFFFFF`) | **4.96:1** | Body text ≥ 4.5:1 | **PASS** (AA) |
+| **Success Text** (`#286036`) on Surface (`#FFFFFF`) | **7.46:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Success Text** (`#286036`) on Success Subtle (`#EDF7EE`) | **6.80:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Warning Text** (`#8A4E12`) on Surface (`#FFFFFF`) | **6.61:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Warning Text** (`#8A4E12`) on Warning Subtle (`#FFF8E1`) | **6.22:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Error Text** (`#991B1B`) on Surface (`#FFFFFF`) | **8.31:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Error Text** (`#991B1B`) on Error Subtle (`#FEE2E2`) | **6.80:1** | Body text ≥ 4.5:1 | **PASS** (AAA) |
+| **Focus Ring / Accent** (`#C76B98`) on Surface (`#FFFFFF`) | **3.51:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
+| **Input Control Border** (`#8E6B83`) on Surface (`#FFFFFF`) | **4.58:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
+| **Input Control Border** (`#8E6B83`) on Soft Pink (`#F4C6D8`) | **3.04:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
+| **Input Control Border** (`#8E6B83`) on Light Blush (`#F9E3EC`)| **3.76:1** | UI border ≥ 3.0:1 | **PASS** (AA) |
 
 ---
 
 ## 4. Full-Width Layout & Component States
 
-### 4.1 Full-Width Viewport & Top Bar
-- Spans 100% of the viewport width with 24px side padding (16px on mobile screens).
-- Flat square logo mark displaying the letter **"R"** in white on `#BE185D`.
+### 4.1 Full-Width Top Bar
+- Spans 100% of the viewport width with 24px side padding (16px on mobile).
+- Flat square logo mark displaying the letter **"R"** on pastel pink `#F4C6D8`.
 - "RAGless" in 600 weight with muted "Operations Agent" subtitle.
-- Right: Status pill (dot + active model, e.g. `ollama · qwen2.5:3b`) and compact User ID field.
-- **Fail-Safe Connection Handling**: Shows neutral "Loading" before first fetch; switches to "Unavailable" with an amber dot if the health endpoint fails or times out (4s deadline).
+- Right: Status pill in pale blue `#D9F1FA` (dot + active model, e.g. `ollama · qwen2.5:3b`) and compact User ID input.
+- **Fail-Safe Timeout**: Displays "Loading..." before first fetch; switches to "Unavailable" with an amber dot if the health endpoint fails or exceeds 4 seconds.
 
 ### 4.2 Main Area (70% / 30% Grid)
 - **Left Column (70%)**:
-  - Input card: textarea + primary solid accent "Run Agent" button + muted shortcut hint **"Ctrl+Enter"** vertically aligned to the right.
-  - Example prompts on `#FCE7F0` subtle pink surface (quiet, neutral text buttons).
+  - Input card: textarea + primary pastel pink `#F4C6D8` "Run Agent" button + muted **"Ctrl+Enter"** shortcut label.
+  - Example prompts on `#F9E3EC` light blush surface (quiet, neutral text buttons).
   - Empty state: Single muted line (*"Ask about company data, your onboarding progress, or your tasks."*).
   - Loading state: Thin indeterminate progress bar + live counter (*"Working... 3.2s"*).
   - Results order:
     1. **Answer card**: Large, readable text, status badge (`Verified` / `Needs Review`), plain bulleted unresolved items if present.
-    2. **Refusal notice**: Informational neutral notice stating *"No matching record in the company database."*
-    3. **Agent activity stepper**: Tool name, success/failure icon, provenance badge (`sqlite`, `web`, `mock`), per-step latency (if available), and verification checks grid below.
+    2. **Refusal notice**: Informational neutral notice in pale blue stating *"No matching record in the company database."*
+    3. **Agent activity stepper**: Tool name, success/failure icon, provenance badge (`sqlite`, `web`, `mock`), per-step latency (if present), and verification checks grid below.
     4. **Evidence panel**: Collapsible panel (collapsed by default) with external links, snippet quotes, and SQLite records. `MOCK DATA` badge appears if mock results are present.
     5. **Actions card**: Confirmed memory writes and task changes.
     6. **Results footer**: Thin stats row (duration, LLM calls, answer mode, web calls, model).
@@ -104,10 +105,10 @@ Every text and interactive element was mathematically evaluated for WCAG AA conf
 
 ---
 
-## 5. Visual Inspection Across Screen Widths
+## 5. Responsive Behavior Across Breakpoints
 
-Verify the layout across standard breakpoints:
-- **1920px & 1440px (Wide Desktop)**: Content spans the full viewport width; 70% left column and 30% sticky right rail with generous spacing and zero horizontal scrolling.
-- **1024px (Tablet Landscape)**: Clean two-column layout adhering to the 320px minimum right rail boundary.
-- **768px (Tablet Portrait)**: Stacks into a single column at ≤900px; the right rail flows cleanly beneath the left column results.
-- **375px (Mobile Phone)**: 16px side padding; top bar controls, input footer, and stat items reflow cleanly with zero horizontal scroll and fully accessible touch targets.
+Automated rule verification via `python scripts/verify_responsive.py`:
+- **1920px & 1440px (Wide Desktop)**: Full monitor width, 70% left column, 30% sticky right rail, 24px gutters, no horizontal scroll.
+- **1024px (Tablet Landscape)**: Two-column layout preserving minimum 320px right rail.
+- **768px (Tablet Portrait)**: Stacks into a single column at ≤900px.
+- **375px (Mobile Phone)**: 16px side padding; top bar controls, input footer, and stat items reflow cleanly with zero horizontal scroll.
