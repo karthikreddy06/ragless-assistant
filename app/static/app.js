@@ -5,10 +5,39 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Header Elements
+  // Auth View & Card Elements
+  const authView = document.getElementById("auth-view");
+  const dashboardView = document.getElementById("dashboard-view");
+  const loginCard = document.getElementById("login-card");
+  const registerCard = document.getElementById("register-card");
+  const switchToRegisterBtn = document.getElementById("switch-to-register-btn");
+  const switchToLoginBtn = document.getElementById("switch-to-login-btn");
+
+  const loginForm = document.getElementById("login-form");
+  const loginEmail = document.getElementById("login-email");
+  const loginPassword = document.getElementById("login-password");
+  const loginSubmitBtn = document.getElementById("login-submit-btn");
+  const loginErrorAlert = document.getElementById("login-error-alert");
+  const loginErrorText = document.getElementById("login-error-text");
+
+  const registerForm = document.getElementById("register-form");
+  const registerName = document.getElementById("register-name");
+  const registerEmail = document.getElementById("register-email");
+  const registerPassword = document.getElementById("register-password");
+  const registerConfirmPassword = document.getElementById("register-confirm-password");
+  const registerSubmitBtn = document.getElementById("register-submit-btn");
+  const registerErrorAlert = document.getElementById("register-error-alert");
+  const registerErrorText = document.getElementById("register-error-text");
+  const registerSuccessAlert = document.getElementById("register-success-alert");
+
+  // User Header Profile Elements
+  const userDisplayName = document.getElementById("user-display-name");
+  const userDisplayEmail = document.getElementById("user-display-email");
+  const logoutBtn = document.getElementById("logout-btn");
+
+  // Header Status Elements
   const statusPill = document.getElementById("status-pill");
   const statusText = document.getElementById("status-text");
-  const userIdInput = document.getElementById("user-id-input");
 
   // Form Elements
   const agentForm = document.getElementById("agent-form");
@@ -73,10 +102,218 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let timerInterval = null;
   let startTime = 0;
+  let currentUser = null;
 
-  // Initialize UI
-  checkHealth();
-  refreshUserState();
+  // View management helpers
+  function showAuthView(mode = "login", errorMsg = "") {
+    currentUser = null;
+    if (dashboardView) dashboardView.classList.add("hidden");
+    if (authView) authView.classList.remove("hidden");
+    clearAuthAlerts();
+
+    if (mode === "register") {
+      if (loginCard) loginCard.classList.add("hidden");
+      if (registerCard) registerCard.classList.remove("hidden");
+    } else {
+      if (registerCard) registerCard.classList.add("hidden");
+      if (loginCard) loginCard.classList.remove("hidden");
+      if (errorMsg && loginErrorAlert && loginErrorText) {
+        loginErrorText.textContent = errorMsg;
+        loginErrorAlert.classList.remove("hidden");
+      }
+    }
+  }
+
+  function showDashboardView(user) {
+    currentUser = user;
+    if (authView) authView.classList.add("hidden");
+    if (dashboardView) dashboardView.classList.remove("hidden");
+
+    if (userDisplayName) {
+      userDisplayName.textContent = user.full_name || user.email || "User";
+    }
+    if (userDisplayEmail) {
+      userDisplayEmail.textContent = user.email || "";
+    }
+
+    checkHealth();
+    refreshUserState();
+  }
+
+  function clearAuthAlerts() {
+    if (loginErrorAlert) loginErrorAlert.classList.add("hidden");
+    if (registerErrorAlert) registerErrorAlert.classList.add("hidden");
+    if (registerSuccessAlert) registerSuccessAlert.classList.add("hidden");
+  }
+
+  async function checkSession() {
+    try {
+      const res = await fetch("/auth/me");
+      if (res.ok) {
+        const user = await res.json();
+        showDashboardView(user);
+        return true;
+      } else {
+        showAuthView("login");
+        return false;
+      }
+    } catch {
+      showAuthView("login");
+      return false;
+    }
+  }
+
+  // Switch between Login and Register views
+  if (switchToRegisterBtn) {
+    switchToRegisterBtn.addEventListener("click", () => {
+      showAuthView("register");
+    });
+  }
+
+  if (switchToLoginBtn) {
+    switchToLoginBtn.addEventListener("click", () => {
+      showAuthView("login");
+    });
+  }
+
+  // Login Form Submission
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearAuthAlerts();
+
+      const email = loginEmail.value.trim();
+      const password = loginPassword.value;
+
+      if (!email || !password) {
+        loginErrorText.textContent = "Please enter both email and password.";
+        loginErrorAlert.classList.remove("hidden");
+        return;
+      }
+
+      loginSubmitBtn.disabled = true;
+      const originalSpan = loginSubmitBtn.querySelector("span");
+      const originalText = originalSpan ? originalSpan.textContent : "Sign In";
+      if (originalSpan) originalSpan.textContent = "Signing In...";
+
+      try {
+        const res = await fetch("/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (res.ok) {
+          loginForm.reset();
+          await checkSession();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          loginErrorText.textContent = errData.detail || "Invalid email or password.";
+          loginErrorAlert.classList.remove("hidden");
+        }
+      } catch {
+        loginErrorText.textContent = "Network error. Please try again.";
+        loginErrorAlert.classList.remove("hidden");
+      } finally {
+        loginSubmitBtn.disabled = false;
+        if (originalSpan) originalSpan.textContent = originalText;
+      }
+    });
+  }
+
+  // Registration Form Submission
+  if (registerForm) {
+    registerForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearAuthAlerts();
+
+      const fullName = registerName.value.trim();
+      const email = registerEmail.value.trim();
+      const password = registerPassword.value;
+      const confirmPassword = registerConfirmPassword.value;
+
+      if (!fullName || !email || !password || !confirmPassword) {
+        registerErrorText.textContent = "Please fill in all required fields.";
+        registerErrorAlert.classList.remove("hidden");
+        return;
+      }
+
+      if (password.length < 8) {
+        registerErrorText.textContent = "Password must be at least 8 characters long.";
+        registerErrorAlert.classList.remove("hidden");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        registerErrorText.textContent = "Passwords do not match.";
+        registerErrorAlert.classList.remove("hidden");
+        return;
+      }
+
+      registerSubmitBtn.disabled = true;
+      const originalSpan = registerSubmitBtn.querySelector("span");
+      const originalText = originalSpan ? originalSpan.textContent : "Create Account";
+      if (originalSpan) originalSpan.textContent = "Creating Account...";
+
+      try {
+        const res = await fetch("/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name: fullName,
+            email,
+            password,
+            confirm_password: confirmPassword,
+          }),
+        });
+
+        if (res.status === 201) {
+          registerSuccessAlert.classList.remove("hidden");
+          const loginRes = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          if (loginRes.ok) {
+            registerForm.reset();
+            await checkSession();
+          } else {
+            setTimeout(() => {
+              showAuthView("login");
+            }, 1200);
+          }
+        } else if (res.status === 409) {
+          registerErrorText.textContent = "An account with this email address already exists.";
+          registerErrorAlert.classList.remove("hidden");
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          registerErrorText.textContent = errData.detail || "Registration failed. Please try again.";
+          registerErrorAlert.classList.remove("hidden");
+        }
+      } catch {
+        registerErrorText.textContent = "Network error. Please try again.";
+        registerErrorAlert.classList.remove("hidden");
+      } finally {
+        registerSubmitBtn.disabled = false;
+        if (originalSpan) originalSpan.textContent = originalText;
+      }
+    });
+  }
+
+  // Logout Handler
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await fetch("/auth/logout", { method: "POST" });
+      } catch {
+        // Proceed to show login
+      }
+      showAuthView("login");
+    });
+  }
+
+  // Initialize Session
+  checkSession();
 
   // Suggestion prompt buttons (both composer chips and welcome cards)
   promptButtons.forEach((btn) => {
@@ -97,16 +334,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // User ID input changes
-  userIdInput.addEventListener("change", () => {
-    refreshUserState();
-  });
-
   // Form submission
   agentForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const question = goalInput.value.trim();
-    const userId = userIdInput.value.trim() || "demo-user";
+    const userId = currentUser ? currentUser.user_id : "demo-user";
 
     if (!question) return;
 
@@ -135,6 +367,11 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(timeoutId);
       stopWorkingTimer();
       runBtn.disabled = false;
+
+      if (resp.status === 401) {
+        showAuthView("login", "Your session has expired. Please log in again.");
+        return;
+      }
 
       if (!resp.ok) {
         const errorData = await resp.json().catch(() => ({}));
@@ -185,13 +422,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Refresh user state (memory + tasks)
   async function refreshUserState() {
-    const userId = userIdInput.value.trim() || "demo-user";
-    await Promise.all([fetchMemory(userId), fetchTasks(userId)]);
+    await Promise.all([fetchMemory(), fetchTasks()]);
   }
 
-  async function fetchMemory(userId) {
+  async function fetchMemory() {
     try {
-      const res = await fetch(`/memory/${encodeURIComponent(userId)}`);
+      const res = await fetch("/memory/me");
+      if (res.status === 401) {
+        showAuthView("login", "Your session has expired. Please log in again.");
+        return;
+      }
       if (!res.ok) {
         progressStatusBadge.textContent = "Unavailable";
         return;
@@ -219,9 +459,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function fetchTasks(userId) {
+  async function fetchTasks() {
     try {
-      const res = await fetch(`/tasks/${encodeURIComponent(userId)}`);
+      const res = await fetch("/tasks/me");
+      if (res.status === 401) {
+        showAuthView("login", "Your session has expired. Please log in again.");
+        return;
+      }
       if (!res.ok) return;
       const data = await res.json();
       const tasks = data.tasks || [];
@@ -339,7 +583,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function handleErrorResponse(status, errorData) {
-    if (status === 422) {
+    if (status === 401) {
+      showAuthView("login", "Your session has expired. Please log in again.");
+    } else if (status === 422) {
       showError("Validation Error (422)", errorData.detail || "Input question or parameters failed schema validation.");
     } else if (status === 503) {
       showError("LLM Service Unavailable (503)", errorData.detail || "Local LLM service is offline or unreachable.");
@@ -656,7 +902,7 @@ document.addEventListener("DOMContentLoaded", () => {
         label.textContent = `${tw.operation}: #${tw.task_id} "${tw.title}"`;
         const badge = document.createElement("span");
         badge.className = `badge ${tw.confirmed ? "badge-verified" : "badge-failed"}`;
-        badge.textContent = mw.confirmed ? "Confirmed" : "Unconfirmed";
+        badge.textContent = tw.confirmed ? "Confirmed" : "Unconfirmed";
         pill.appendChild(label);
         pill.appendChild(badge);
         tasksChangedList.appendChild(pill);

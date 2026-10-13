@@ -9,404 +9,578 @@
 </head>
 <body>
   <div class="app-layout">
-    <!-- Full-Width Top Bar -->
-    <header class="top-bar">
-      <div class="top-bar-left">
-        <div class="logo-mark" aria-hidden="true">
-          <span>R</span>
-        </div>
-        <div class="brand-group">
-          <span class="brand-title">RAGless</span>
-          <span class="brand-separator" aria-hidden="true">/</span>
-          <span class="brand-subtitle">Operations Agent</span>
-        </div>
-      </div>
-
-      <div class="top-bar-right">
-        <div class="user-id-group">
-          <label for="user-id-input" class="user-id-label">User</label>
-          <input type="text" id="user-id-input" class="user-id-input" value="demo-user" spellcheck="false" maxlength="64">
-        </div>
-        <div id="status-pill" class="status-pill status-loading" aria-live="polite">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span id="status-text" class="status-text">Loading...</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- Full-Width Main Area: ~70% Workspace / ~30% Sidebar Grid -->
-    <main class="main-content">
-      <!-- Left Column: Workspace (~70%) -->
-      <div class="primary-column">
-        <!-- 1. Query Composer Card -->
-        <section class="card composer-card" aria-label="Objective Input">
-          <div class="composer-header">
-            <div class="composer-title-group">
-              <svg class="header-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-              </svg>
-              <h2 class="composer-heading">Agent Query Composer</h2>
+    <!-- ====================================================================
+         1. Authentication View (Login & Registration Split Layout)
+         ==================================================================== -->
+    <div id="auth-view" class="auth-container hidden" aria-label="Authentication">
+      <div class="auth-split-wrapper">
+        <!-- Left Column: Branding, Value Pillars & Abstract Graphic -->
+        <div class="auth-branding-panel">
+          <div class="auth-brand-header">
+            <div class="logo-mark" aria-hidden="true">
+              <span>R</span>
             </div>
-            <span class="shortcut-pill" aria-hidden="true">Press Ctrl + Enter to run</span>
-          </div>
-
-          <form id="agent-form" class="agent-form">
-            <div class="input-container">
-              <label for="goal-input" class="sr-only">Enter objective or question</label>
-              <textarea id="goal-input" class="goal-textarea" rows="3" placeholder="Ask about company policies, request onboarding steps, or assign a task..." required></textarea>
-            </div>
-
-            <div class="input-footer">
-              <div class="suggestions-group" aria-label="Example prompts">
-                <span class="suggestions-label">Quick Prompts:</span>
-                <button type="button" class="chip prompt-btn" data-prompt="Prepare everything I need for my first week">First week</button>
-                <button type="button" class="chip prompt-btn" data-prompt="What do I still need to do?">Remaining onboarding</button>
-                <button type="button" class="chip prompt-btn" data-prompt="Create tasks for my onboarding">Create onboarding tasks</button>
-                <button type="button" class="chip prompt-btn" data-prompt="How does our annual leave compare to the UK statutory minimum?">Leave vs UK statutory</button>
-              </div>
-
-              <div class="action-group">
-                <button type="submit" id="run-btn" class="btn btn-primary">
-                  <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polygon points="5 3 19 12 5 21 5 3"/>
-                  </svg>
-                  <span>Run Agent</span>
-                </button>
-              </div>
-            </div>
-          </form>
-
-          <!-- Loading State: Indeterminate Bar + Live Counter -->
-          <div id="working-card" class="working-state hidden" aria-live="polite">
-            <div class="progress-bar-track" aria-hidden="true">
-              <div class="progress-bar-indeterminate"></div>
-            </div>
-            <div class="working-meta">
-              <span class="working-label">Executing multi-step plan...</span>
-              <span id="elapsed-counter" class="working-timer">0.0s</span>
+            <div class="brand-group">
+              <span class="brand-title">RAGless</span>
+              <span class="brand-separator" aria-hidden="true">/</span>
+              <span class="brand-subtitle">Operations Agent</span>
             </div>
           </div>
-        </section>
 
-        <!-- 2. Polished Welcome Section (Shown when no active result/error) -->
-        <section id="welcome-section" class="card welcome-card" aria-label="Welcome Overview">
-          <div class="welcome-content">
-            <div class="welcome-text-col">
-              <div class="welcome-badge">
-                <span class="badge-dot" aria-hidden="true"></span>
-                <span>AI Operations Workspace</span>
-              </div>
-              <h1 class="welcome-title">Your operations, intelligently connected.</h1>
-              <p class="welcome-description">
-                Query company knowledge, review onboarding progress, and manage tasks with deterministic verification and verified evidence.
-              </p>
+          <div class="auth-hero-copy">
+            <h1 class="auth-headline">Your operations, intelligently connected.</h1>
+            <p class="auth-subhead">
+              Autonomous, grounded AI operations with deterministic multi-step planning, verified SQLite provenance, and strict multi-user isolation.
+            </p>
+          </div>
 
-              <!-- 3 Compact Suggestion Cards -->
-              <div class="welcome-suggestions-grid">
-                <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="Prepare everything I need for my first week">
-                  <div class="suggestion-icon-wrap icon-blush" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                      <line x1="16" y1="2" x2="16" y2="6"/>
-                      <line x1="8" y1="2" x2="8" y2="6"/>
-                      <line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                  </div>
-                  <div class="suggestion-text">
-                    <span class="suggestion-title">First-Week Roadmap</span>
-                    <span class="suggestion-subtitle">Prepare policies, schedules, & tools</span>
-                  </div>
-                  <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-
-                <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="What do I still need to do?">
-                  <div class="suggestion-icon-wrap icon-blue" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="10"/>
-                      <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                  </div>
-                  <div class="suggestion-text">
-                    <span class="suggestion-title">Remaining Onboarding</span>
-                    <span class="suggestion-subtitle">Review pending steps & requirements</span>
-                  </div>
-                  <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-
-                <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="How does our annual leave compare to the UK statutory minimum?">
-                  <div class="suggestion-icon-wrap icon-pink" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                    </svg>
-                  </div>
-                  <div class="suggestion-text">
-                    <span class="suggestion-title">Leave vs UK Statutory</span>
-                    <span class="suggestion-subtitle">Compare company policy to UK minimum</span>
-                  </div>
-                  <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
+          <div class="auth-pillars">
+            <div class="pillar-item">
+              <div class="pillar-bullet" aria-hidden="true">✓</div>
+              <div class="pillar-text">
+                <span class="pillar-title">Deterministic Multi-Step Execution</span>
+                <span class="pillar-desc">Verifiable tool execution with zero hallucinated state modifications.</span>
               </div>
             </div>
-
-            <!-- Tasteful Connected-Node AI Illustration -->
-            <div class="welcome-visual-col" aria-hidden="true">
-              <div class="illustration-backdrop">
-                <svg class="network-svg" viewBox="0 0 260 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Decorative Connections -->
-                  <path d="M60 70 L130 110 L200 65" stroke="#EADBE5" stroke-width="2" stroke-dasharray="3 3"/>
-                  <path d="M130 110 L75 165" stroke="#EADBE5" stroke-width="2"/>
-                  <path d="M130 110 L195 160" stroke="#EADBE5" stroke-width="2"/>
-                  <path d="M60 70 L75 165" stroke="#B9E5F5" stroke-width="1.5" stroke-dasharray="2 2"/>
-                  <path d="M200 65 L195 160" stroke="#F4C6D8" stroke-width="1.5" stroke-dasharray="2 2"/>
-
-                  <!-- Outer Orbit Pulse -->
-                  <circle cx="130" cy="110" r="48" stroke="#F9E3EC" stroke-width="1.5"/>
-                  <circle cx="130" cy="110" r="68" stroke="#D9F1FA" stroke-width="1" stroke-dasharray="4 4"/>
-
-                  <!-- Peripheral Node 1: Policy / Knowledge -->
-                  <circle cx="60" cy="70" r="18" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
-                  <circle cx="60" cy="70" r="8" fill="#B9E5F5"/>
-
-                  <!-- Peripheral Node 2: Web Research -->
-                  <circle cx="200" cy="65" r="18" fill="#FFFFFF" stroke="#F4C6D8" stroke-width="2"/>
-                  <circle cx="200" cy="65" r="8" fill="#F4C6D8"/>
-
-                  <!-- Peripheral Node 3: Memory / Profile -->
-                  <circle cx="75" cy="165" r="18" fill="#FFFFFF" stroke="#F9E3EC" stroke-width="2"/>
-                  <circle cx="75" cy="165" r="8" fill="#C76B98"/>
-
-                  <!-- Peripheral Node 4: Task Execution -->
-                  <circle cx="195" cy="160" r="18" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
-                  <circle cx="195" cy="160" r="8" fill="#796B79"/>
-
-                  <!-- Center Core Node: Operations Agent -->
-                  <circle cx="130" cy="110" r="26" fill="#FDF7FA" stroke="#C76B98" stroke-width="2.5"/>
-                  <circle cx="130" cy="110" r="14" fill="#F4C6D8"/>
-                  <circle cx="130" cy="110" r="5" fill="#382936"/>
-                </svg>
+            <div class="pillar-item">
+              <div class="pillar-bullet" aria-hidden="true">✓</div>
+              <div class="pillar-text">
+                <span class="pillar-title">Complete Multi-User Isolation</span>
+                <span class="pillar-desc">Dedicated onboarding checklists, personal task boards, and private memory.</span>
+              </div>
+            </div>
+            <div class="pillar-item">
+              <div class="pillar-bullet" aria-hidden="true">✓</div>
+              <div class="pillar-text">
+                <span class="pillar-title">Argon2id & Secure Sessions</span>
+                <span class="pillar-desc">State-of-the-art password security with HttpOnly session cookies.</span>
               </div>
             </div>
           </div>
-        </section>
 
-        <!-- Legacy hook element for backward compatibility with tests/scripts -->
-        <span id="empty-state-card" class="sr-only">Ask about company data, your onboarding progress, or your tasks.</span>
-
-        <!-- 3. Error Card -->
-        <section id="error-card" class="notice notice-error hidden" role="alert">
-          <div class="notice-icon" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
+          <!-- Abstract Connected-Node Decorative Visual -->
+          <div class="auth-visual-wrap" aria-hidden="true">
+            <svg class="auth-network-svg" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M40 50 L120 80 L200 45" stroke="#EADBE5" stroke-width="2" stroke-dasharray="3 3"/>
+              <path d="M120 80 L60 120" stroke="#EADBE5" stroke-width="2"/>
+              <path d="M120 80 L180 125" stroke="#EADBE5" stroke-width="2"/>
+              <circle cx="120" cy="80" r="36" stroke="#F9E3EC" stroke-width="1.5"/>
+              <circle cx="40" cy="50" r="14" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
+              <circle cx="40" cy="50" r="6" fill="#B9E5F5"/>
+              <circle cx="200" cy="45" r="14" fill="#FFFFFF" stroke="#F4C6D8" stroke-width="2"/>
+              <circle cx="200" cy="45" r="6" fill="#F4C6D8"/>
+              <circle cx="60" cy="120" r="14" fill="#FFFFFF" stroke="#F9E3EC" stroke-width="2"/>
+              <circle cx="60" cy="120" r="6" fill="#C76B98"/>
+              <circle cx="180" cy="125" r="14" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
+              <circle cx="180" cy="125" r="6" fill="#796B79"/>
+              <circle cx="120" cy="80" r="22" fill="#FDF7FA" stroke="#C76B98" stroke-width="2.5"/>
+              <circle cx="120" cy="80" r="11" fill="#F4C6D8"/>
             </svg>
           </div>
-          <div class="notice-content">
-            <h3 id="error-title" class="notice-title">Request Error</h3>
-            <p id="error-message" class="notice-message"></p>
-          </div>
-        </section>
+        </div>
 
-        <!-- 4. Results Region (Displayed when agent responds) -->
-        <div id="results-region" class="results-region" role="region" aria-label="Agent Results">
-          <!-- Answer Card (Most Prominent Result) -->
-          <section id="answer-card" class="card answer-card hidden">
-            <div class="card-header">
-              <div class="card-title-group">
-                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-                <h2 id="answer-card-title" class="card-title">Answer</h2>
-              </div>
-              <div id="verification-badge" class="badge"></div>
+        <!-- Right Column: Authentication Card (Login or Register) -->
+        <div class="auth-form-panel">
+          <!-- 1A. Login Card -->
+          <div id="login-card" class="card auth-card">
+            <div class="auth-card-header">
+              <h2 class="auth-card-title">Welcome back</h2>
+              <p class="auth-card-subtitle">Sign in to access your personal operations dashboard.</p>
             </div>
 
-            <!-- Refusal Banner -->
-            <div id="refusal-banner" class="notice notice-info hidden">
+            <!-- Login Error Alert -->
+            <div id="login-error-alert" class="notice notice-error hidden" role="alert">
               <div class="notice-icon" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="16" x2="12" y2="12"/>
-                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
               </div>
               <div class="notice-content">
-                <p id="refusal-banner-text" class="notice-message">No matching record in the company database.</p>
+                <span id="login-error-text" class="notice-message"></span>
               </div>
             </div>
 
-            <div id="answer-text" class="answer-text"></div>
+            <form id="login-form" class="auth-form" novalidate>
+              <div class="form-group">
+                <label for="login-email" class="form-label">Email address</label>
+                <input type="email" id="login-email" class="form-input" placeholder="name@company.com" autocomplete="email" required>
+              </div>
 
-            <div id="unresolved-box" class="unresolved-box hidden">
-              <h4 class="unresolved-title">Unresolved items</h4>
-              <ul id="unresolved-list" class="unresolved-list"></ul>
+              <div class="form-group">
+                <label for="login-password" class="form-label">Password</label>
+                <input type="password" id="login-password" class="form-input" placeholder="••••••••" autocomplete="current-password" required>
+              </div>
+
+              <button type="submit" id="login-submit-btn" class="btn btn-primary auth-submit-btn">
+                <span>Sign In</span>
+              </button>
+            </form>
+
+            <div class="auth-footer-toggle">
+              <span>Don't have an account?</span>
+              <button type="button" id="switch-to-register-btn" class="link-btn">Create one</button>
             </div>
-          </section>
+          </div>
 
-          <!-- Agent Activity Stepper -->
-          <section id="trace-card" class="card trace-card hidden">
-            <div class="card-header">
-              <div class="card-title-group">
-                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          <!-- 1B. Registration Card (Hidden initially) -->
+          <div id="register-card" class="card auth-card hidden">
+            <div class="auth-card-header">
+              <h2 class="auth-card-title">Create an account</h2>
+              <p class="auth-card-subtitle">Register to get your dedicated workspace with full data isolation.</p>
+            </div>
+
+            <!-- Register Error Alert -->
+            <div id="register-error-alert" class="notice notice-error hidden" role="alert">
+              <div class="notice-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
-                <h2 class="card-title">Agent activity</h2>
               </div>
-              <span id="trace-step-count" class="badge badge-neutral"></span>
+              <div class="notice-content">
+                <span id="register-error-text" class="notice-message"></span>
+              </div>
             </div>
 
-            <div class="activity-section">
-              <div class="section-label">Execution steps</div>
-              <div id="trace-steps" class="stepper-list"></div>
+            <!-- Register Success Alert -->
+            <div id="register-success-alert" class="notice notice-info hidden" role="status">
+              <div class="notice-content">
+                <span class="notice-message">Registration successful! Signing you in...</span>
+              </div>
             </div>
 
-            <div class="activity-section">
-              <div class="section-label">Verification checks</div>
-              <div id="verification-checks" class="checks-list"></div>
-            </div>
-          </section>
+            <form id="register-form" class="auth-form" novalidate>
+              <div class="form-group">
+                <label for="register-name" class="form-label">Full name</label>
+                <input type="text" id="register-name" class="form-input" placeholder="Alex Morgan" autocomplete="name" required>
+              </div>
 
-          <!-- Evidence Panel (Collapsed) -->
-          <details id="evidence-panel" class="card collapsible-card hidden">
-            <summary class="panel-summary">
-              <div class="card-title-group">
-                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="16" y1="13" x2="8" y2="13"/>
-                  <line x1="16" y1="17" x2="8" y2="17"/>
-                  <polyline points="10 9 9 9 8 9"/>
-                </svg>
-                <span class="summary-title">Evidence & sources</span>
+              <div class="form-group">
+                <label for="register-email" class="form-label">Email address</label>
+                <input type="email" id="register-email" class="form-input" placeholder="alex@company.com" autocomplete="email" required>
               </div>
-              <div class="summary-meta">
-                <span id="evidence-count" class="badge badge-neutral"></span>
-                <span id="evidence-mock-badge" class="badge badge-mock hidden">MOCK DATA</span>
-              </div>
-            </summary>
-            <div class="panel-body">
-              <div class="evidence-subgroup">
-                <h4 class="subgroup-title">External web sources</h4>
-                <div id="sources-list" class="sources-list"></div>
-              </div>
-              <div class="evidence-subgroup">
-                <h4 class="subgroup-title">Internal database records</h4>
-                <div id="internal-evidence" class="data-table-wrapper"></div>
-              </div>
-            </div>
-          </details>
 
-          <!-- Actions Panel -->
-          <section id="actions-panel" class="card actions-card hidden">
-            <div class="card-header">
-              <div class="card-title-group">
-                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-                <h2 class="card-title">State modifications</h2>
+              <div class="form-group">
+                <label for="register-password" class="form-label">Password</label>
+                <input type="password" id="register-password" class="form-input" placeholder="Min. 8 characters" autocomplete="new-password" required>
               </div>
-            </div>
-            <div class="actions-grid">
-              <div class="action-column">
-                <h3 class="action-subtitle">Memory writes</h3>
-                <div id="memory-writes-list" class="action-list"></div>
-              </div>
-              <div class="action-column">
-                <h3 class="action-subtitle">Tasks changed</h3>
-                <div id="tasks-changed-list" class="action-list"></div>
-              </div>
-            </div>
-          </section>
 
-          <!-- Results Stats Footer Row -->
-          <div id="results-footer-stats" class="results-stats-row hidden">
-            <span class="stat-cell"><span class="stat-name">Duration</span> <span id="stat-latency" class="stat-val">-</span></span>
-            <span class="stat-cell"><span class="stat-name">LLM calls</span> <span id="stat-llm-calls" class="stat-val">-</span></span>
-            <span class="stat-cell"><span class="stat-name">Answer mode</span> <span id="stat-answer-mode" class="stat-val">-</span></span>
-            <span class="stat-cell"><span class="stat-name">Web calls</span> <span id="stat-web-calls" class="stat-val">-</span></span>
-            <span class="stat-cell"><span class="stat-name">Model</span> <span id="stat-model" class="stat-val">-</span></span>
+              <div class="form-group">
+                <label for="register-confirm-password" class="form-label">Confirm password</label>
+                <input type="password" id="register-confirm-password" class="form-input" placeholder="Repeat password" autocomplete="new-password" required>
+              </div>
+
+              <button type="submit" id="register-submit-btn" class="btn btn-primary auth-submit-btn">
+                <span>Create Account</span>
+              </button>
+            </form>
+
+            <div class="auth-footer-toggle">
+              <span>Already have an account?</span>
+              <button type="button" id="switch-to-login-btn" class="link-btn">Sign in</button>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Right Column: Sidebar (~30% Sticky) -->
-      <aside class="sidebar-column">
-        <!-- Onboarding Progress Card -->
-        <section class="card sidebar-card" aria-labelledby="progress-heading">
-          <div class="card-header">
-            <div class="card-title-group">
-              <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-              <h2 id="progress-heading" class="card-title">Onboarding progress</h2>
-            </div>
-            <span id="progress-status-badge" class="badge badge-neutral">Loading...</span>
+    <!-- ====================================================================
+         2. Authenticated Dashboard View
+         ==================================================================== -->
+    <div id="dashboard-view" class="dashboard-container">
+      <!-- Full-Width Top Bar -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <div class="logo-mark" aria-hidden="true">
+            <span>R</span>
           </div>
-          <div class="progress-body">
-            <div class="progress-headline">
-              <span id="progress-counts" class="progress-counts">0 of 0 complete</span>
-              <span id="progress-percent" class="progress-percent">0%</span>
-            </div>
-            <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-              <div id="progress-bar-fill" class="progress-fill"></div>
-            </div>
-            <div class="profile-rows">
-              <div class="profile-row">
-                <span class="profile-key">Role</span>
-                <span id="profile-role" class="profile-val">Not set</span>
-              </div>
-              <div class="profile-row">
-                <span class="profile-key">Department</span>
-                <span id="profile-department" class="profile-val">Not set</span>
-              </div>
-            </div>
+          <div class="brand-group">
+            <span class="brand-title">RAGless</span>
+            <span class="brand-separator" aria-hidden="true">/</span>
+            <span class="brand-subtitle">Operations Agent</span>
           </div>
-        </section>
+        </div>
 
-        <!-- Tasks Card -->
-        <section class="card sidebar-card" aria-labelledby="tasks-heading">
-          <div class="card-header">
-            <div class="card-title-group">
-              <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 11l3 3L22 4"/>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-              </svg>
-              <h2 id="tasks-heading" class="card-title">Tasks</h2>
+        <div class="top-bar-right">
+          <!-- Authenticated User Profile Pill & Logout -->
+          <div class="user-auth-badge">
+            <div class="user-avatar-dot" aria-hidden="true"></div>
+            <div class="user-meta-info">
+              <span id="user-display-name" class="user-display-name">Loading...</span>
+              <span id="user-display-email" class="user-display-email"></span>
             </div>
-            <span id="tasks-count-badge" class="badge badge-neutral">0</span>
+            <button type="button" id="logout-btn" class="btn-logout" title="Sign out of RAGless">
+              <span>Log out</span>
+            </button>
           </div>
-          <div class="tasks-body">
-            <div id="tasks-container" class="tasks-list">
-              <div class="tasks-empty-state">
-                <div class="tasks-empty-icon" aria-hidden="true">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+
+          <div id="status-pill" class="status-pill status-loading" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-text" class="status-text">Loading...</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Full-Width Main Area: ~70% Workspace / ~30% Sidebar Grid -->
+      <main class="main-content">
+        <!-- Left Column: Workspace (~70%) -->
+        <div class="primary-column">
+          <!-- 1. Query Composer Card -->
+          <section class="card composer-card" aria-label="Objective Input">
+            <div class="composer-header">
+              <div class="composer-title-group">
+                <svg class="header-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                <h2 class="composer-heading">Agent Query Composer</h2>
+              </div>
+              <span class="shortcut-pill" aria-hidden="true">Press Ctrl + Enter to run</span>
+            </div>
+
+            <form id="agent-form" class="agent-form">
+              <div class="input-container">
+                <label for="goal-input" class="sr-only">Enter objective or question</label>
+                <textarea id="goal-input" class="goal-textarea" rows="3" placeholder="Ask about company policies, request onboarding steps, or assign a task..." required></textarea>
+              </div>
+
+              <div class="input-footer">
+                <div class="suggestions-group" aria-label="Example prompts">
+                  <span class="suggestions-label">Quick Prompts:</span>
+                  <button type="button" class="chip prompt-btn" data-prompt="Prepare everything I need for my first week">First week</button>
+                  <button type="button" class="chip prompt-btn" data-prompt="What do I still need to do?">Remaining onboarding</button>
+                  <button type="button" class="chip prompt-btn" data-prompt="Create tasks for my onboarding">Create onboarding tasks</button>
+                  <button type="button" class="chip prompt-btn" data-prompt="How does our annual leave compare to the UK statutory minimum?">Leave vs UK statutory</button>
+                </div>
+
+                <div class="action-group">
+                  <button type="submit" id="run-btn" class="btn btn-primary">
+                    <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <span>Run Agent</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            <!-- Loading State: Indeterminate Bar + Live Counter -->
+            <div id="working-card" class="working-state hidden" aria-live="polite">
+              <div class="progress-bar-track" aria-hidden="true">
+                <div class="progress-bar-indeterminate"></div>
+              </div>
+              <div class="working-meta">
+                <span class="working-label">Executing multi-step plan...</span>
+                <span id="elapsed-counter" class="working-timer">0.0s</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Polished Welcome Section (Shown when no active result/error) -->
+          <section id="welcome-section" class="card welcome-card" aria-label="Welcome Overview">
+            <div class="welcome-content">
+              <div class="welcome-text-col">
+                <div class="welcome-badge">
+                  <span class="badge-dot" aria-hidden="true"></span>
+                  <span>AI Operations Workspace</span>
+                </div>
+                <h1 class="welcome-title">Your operations, intelligently connected.</h1>
+                <p class="welcome-description">
+                  Query company knowledge, review onboarding progress, and manage tasks with deterministic verification and verified evidence.
+                </p>
+
+                <!-- 3 Compact Suggestion Cards -->
+                <div class="welcome-suggestions-grid">
+                  <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="Prepare everything I need for my first week">
+                    <div class="suggestion-icon-wrap icon-blush" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                    </div>
+                    <div class="suggestion-text">
+                      <span class="suggestion-title">First-Week Roadmap</span>
+                      <span class="suggestion-subtitle">Prepare policies, schedules, & tools</span>
+                    </div>
+                    <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+
+                  <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="What do I still need to do?">
+                    <div class="suggestion-icon-wrap icon-blue" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                      </svg>
+                    </div>
+                    <div class="suggestion-text">
+                      <span class="suggestion-title">Remaining Onboarding</span>
+                      <span class="suggestion-subtitle">Review pending steps & requirements</span>
+                    </div>
+                    <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+
+                  <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="How does our annual leave compare to the UK statutory minimum?">
+                    <div class="suggestion-icon-wrap icon-pink" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                      </svg>
+                    </div>
+                    <div class="suggestion-text">
+                      <span class="suggestion-title">Leave vs UK Statutory</span>
+                      <span class="suggestion-subtitle">Compare company policy to UK minimum</span>
+                    </div>
+                    <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tasteful Connected-Node AI Illustration -->
+              <div class="welcome-visual-col" aria-hidden="true">
+                <div class="illustration-backdrop">
+                  <svg class="network-svg" viewBox="0 0 260 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M60 70 L130 110 L200 65" stroke="#EADBE5" stroke-width="2" stroke-dasharray="3 3"/>
+                    <path d="M130 110 L75 165" stroke="#EADBE5" stroke-width="2"/>
+                    <path d="M130 110 L195 160" stroke="#EADBE5" stroke-width="2"/>
+                    <path d="M60 70 L75 165" stroke="#B9E5F5" stroke-width="1.5" stroke-dasharray="2 2"/>
+                    <path d="M200 65 L195 160" stroke="#F4C6D8" stroke-width="1.5" stroke-dasharray="2 2"/>
+                    <circle cx="130" cy="110" r="48" stroke="#F9E3EC" stroke-width="1.5"/>
+                    <circle cx="130" cy="110" r="68" stroke="#D9F1FA" stroke-width="1" stroke-dasharray="4 4"/>
+                    <circle cx="60" cy="70" r="18" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
+                    <circle cx="60" cy="70" r="8" fill="#B9E5F5"/>
+                    <circle cx="200" cy="65" r="18" fill="#FFFFFF" stroke="#F4C6D8" stroke-width="2"/>
+                    <circle cx="200" cy="65" r="8" fill="#F4C6D8"/>
+                    <circle cx="75" cy="165" r="18" fill="#FFFFFF" stroke="#F9E3EC" stroke-width="2"/>
+                    <circle cx="75" cy="165" r="8" fill="#C76B98"/>
+                    <circle cx="195" cy="160" r="18" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
+                    <circle cx="195" cy="160" r="8" fill="#796B79"/>
+                    <circle cx="130" cy="110" r="26" fill="#FDF7FA" stroke="#C76B98" stroke-width="2.5"/>
+                    <circle cx="130" cy="110" r="14" fill="#F4C6D8"/>
+                    <circle cx="130" cy="110" r="5" fill="#382936"/>
                   </svg>
                 </div>
-                <p class="empty-hint">No tasks recorded for user.</p>
-                <p class="empty-subhint">Tasks created by the agent will appear here.</p>
               </div>
             </div>
-          </div>
-        </section>
-      </aside>
-    </main>
+          </section>
 
-    <!-- Full-Width Page Footer -->
-    <footer class="page-footer">
-      <div class="footer-guarantees">
-        <span>Deterministic multi-step execution &middot; Parameterized SQLite &middot; Taint isolation</span>
-      </div>
-    </footer>
+          <!-- Legacy hook element for backward compatibility with tests/scripts -->
+          <span id="empty-state-card" class="sr-only">Ask about company data, your onboarding progress, or your tasks.</span>
+
+          <!-- 3. Error Card -->
+          <section id="error-card" class="notice notice-error hidden" role="alert">
+            <div class="notice-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div class="notice-content">
+              <h3 id="error-title" class="notice-title">Request Error</h3>
+              <p id="error-message" class="notice-message"></p>
+            </div>
+          </section>
+
+          <!-- 4. Results Region (Displayed when agent responds) -->
+          <div id="results-region" class="results-region" role="region" aria-label="Agent Results">
+            <!-- Answer Card (Most Prominent Result) -->
+            <section id="answer-card" class="card answer-card hidden">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <h2 id="answer-card-title" class="card-title">Answer</h2>
+                </div>
+                <div id="verification-badge" class="badge"></div>
+              </div>
+
+              <!-- Refusal Banner -->
+              <div id="refusal-banner" class="notice notice-info hidden">
+                <div class="notice-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                </div>
+                <div class="notice-content">
+                  <p id="refusal-banner-text" class="notice-message">No matching record in the company database.</p>
+                </div>
+              </div>
+
+              <div id="answer-text" class="answer-text"></div>
+
+              <div id="unresolved-box" class="unresolved-box hidden">
+                <h4 class="unresolved-title">Unresolved items</h4>
+                <ul id="unresolved-list" class="unresolved-list"></ul>
+              </div>
+            </section>
+
+            <!-- Agent Activity Stepper -->
+            <section id="trace-card" class="card trace-card hidden">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  <h2 class="card-title">Agent activity</h2>
+                </div>
+                <span id="trace-step-count" class="badge badge-neutral"></span>
+              </div>
+
+              <div class="activity-section">
+                <div class="section-label">Execution steps</div>
+                <div id="trace-steps" class="stepper-list"></div>
+              </div>
+
+              <div class="activity-section">
+                <div class="section-label">Verification checks</div>
+                <div id="verification-checks" class="checks-list"></div>
+              </div>
+            </section>
+
+            <!-- Evidence Panel (Collapsed) -->
+            <details id="evidence-panel" class="card collapsible-card hidden">
+              <summary class="panel-summary">
+                <div class="card-title-group">
+                  <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                  <span class="summary-title">Evidence & sources</span>
+                </div>
+                <div class="summary-meta">
+                  <span id="evidence-count" class="badge badge-neutral"></span>
+                  <span id="evidence-mock-badge" class="badge badge-mock hidden">MOCK DATA</span>
+                </div>
+              </summary>
+              <div class="panel-body">
+                <div class="evidence-subgroup">
+                  <h4 class="subgroup-title">External web sources</h4>
+                  <div id="sources-list" class="sources-list"></div>
+                </div>
+                <div class="evidence-subgroup">
+                  <h4 class="subgroup-title">Internal database records</h4>
+                  <div id="internal-evidence" class="data-table-wrapper"></div>
+                </div>
+              </div>
+            </details>
+
+            <!-- Actions Panel -->
+            <section id="actions-panel" class="card actions-card hidden">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                  <h2 class="card-title">State modifications</h2>
+                </div>
+              </div>
+              <div class="actions-grid">
+                <div class="action-column">
+                  <h3 class="action-subtitle">Memory writes</h3>
+                  <div id="memory-writes-list" class="action-list"></div>
+                </div>
+                <div class="action-column">
+                  <h3 class="action-subtitle">Tasks changed</h3>
+                  <div id="tasks-changed-list" class="action-list"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Results Stats Footer Row -->
+            <div id="results-footer-stats" class="results-stats-row hidden">
+              <span class="stat-cell"><span class="stat-name">Duration</span> <span id="stat-latency" class="stat-val">-</span></span>
+              <span class="stat-cell"><span class="stat-name">LLM calls</span> <span id="stat-llm-calls" class="stat-val">-</span></span>
+              <span class="stat-cell"><span class="stat-name">Answer mode</span> <span id="stat-answer-mode" class="stat-val">-</span></span>
+              <span class="stat-cell"><span class="stat-name">Web calls</span> <span id="stat-web-calls" class="stat-val">-</span></span>
+              <span class="stat-cell"><span class="stat-name">Model</span> <span id="stat-model" class="stat-val">-</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Sidebar (~30% Sticky) -->
+        <aside class="sidebar-column">
+          <!-- Onboarding Progress Card -->
+          <section class="card sidebar-card" aria-labelledby="progress-heading">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <h2 id="progress-heading" class="card-title">Onboarding progress</h2>
+              </div>
+              <span id="progress-status-badge" class="badge badge-neutral">Loading...</span>
+            </div>
+            <div class="progress-body">
+              <div class="progress-headline">
+                <span id="progress-counts" class="progress-counts">0 of 0 complete</span>
+                <span id="progress-percent" class="progress-percent">0%</span>
+              </div>
+              <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                <div id="progress-bar-fill" class="progress-fill"></div>
+              </div>
+              <div class="profile-rows">
+                <div class="profile-row">
+                  <span class="profile-key">Role</span>
+                  <span id="profile-role" class="profile-val">Not set</span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-key">Department</span>
+                  <span id="profile-department" class="profile-val">Not set</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Tasks Card -->
+          <section class="card sidebar-card" aria-labelledby="tasks-heading">
+            <div class="card-header">
+              <div class="card-title-group">
+                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 11l3 3L22 4"/>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                <h2 id="tasks-heading" class="card-title">Tasks</h2>
+              </div>
+              <span id="tasks-count-badge" class="badge badge-neutral">0</span>
+            </div>
+            <div class="tasks-body">
+              <div id="tasks-container" class="tasks-list">
+                <div class="tasks-empty-state">
+                  <div class="tasks-empty-icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                    </svg>
+                  </div>
+                  <p class="empty-hint">No tasks recorded for user.</p>
+                  <p class="empty-subhint">Tasks created by the agent will appear here.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <!-- Full-Width Page Footer -->
+      <footer class="page-footer">
+        <div class="footer-guarantees">
+          <span>Deterministic multi-step execution &middot; Parameterized SQLite &middot; Multi-user isolation</span>
+        </div>
+      </footer>
+    </div>
   </div>
 
   <script src="/ui/app.js" defer></script>

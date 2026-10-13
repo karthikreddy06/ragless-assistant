@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
-from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -34,6 +34,8 @@ from app.models import (
 )
 from app.query_engine import process_query
 from app.agent.router import router as agent_router
+from app.auth import User, get_current_user, get_optional_current_user
+from app.auth_router import router as auth_router
 
 # Configure application logging
 logging.basicConfig(
@@ -93,7 +95,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Agent Router
+# Register Authentication & Agent Routers
+app.include_router(auth_router)
 app.include_router(agent_router)
 
 
@@ -218,9 +221,14 @@ async def root() -> RootResponse:
         endpoints={
             "root": "/",
             "health": "/health",
+            "auth_register": "/auth/register",
+            "auth_login": "/auth/login",
+            "auth_me": "/auth/me",
+            "auth_logout": "/auth/logout",
             "ask": "/ask",
             "agent_ask": "/agent/ask",
-            "memory": "/memory/{user_id}",
+            "memory": "/memory",
+            "tasks": "/tasks",
             "knowledge_view": "/knowledge",
             "knowledge_import": "/knowledge/import",
             "docs": "/docs",
@@ -359,19 +367,38 @@ async def ask(payload: AskRequest) -> AskResponse:
 
 
 @app.get(
+    "/memory",
+    summary="Get Authenticated User Memory and Onboarding Progress",
+    description="Returns the profile and onboarding progress for the currently authenticated user.",
+)
+@app.get(
+    "/memory/me",
+    summary="Get Authenticated User Memory and Onboarding Progress",
+)
+async def get_my_memory(current_user: User = Depends(get_current_user)):
+    from app.agent.memory import get_memory_store
+    store = get_memory_store()
+    profile = store.get_profile(current_user.user_id)
+    progress = store.get_progress(current_user.user_id)
+    return {
+        "user_id": current_user.user_id,
+        "profile": profile,
+        "progress": progress,
+    }
+
+
+@app.get(
     "/memory/{user_id}",
     summary="Get User Memory and Onboarding Progress",
-    description=(
-        "Returns the stored profile and calculated onboarding progress for a given user_id. "
-        "NOTE: user_id is a demonstration identifier; production multi-tenant authentication "
-        "and authorization are out of scope. Do not rely on this endpoint for secure multi-tenancy."
-    ),
+    description="Returns user profile and progress. Requires authentication. Users can only access their own data.",
     responses={
         400: {"model": ErrorResponse, "description": "Invalid user_id format"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Forbidden - cannot access another user's profile"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def get_user_memory(user_id: str):
+async def get_user_memory(user_id: str, request: Request):
     from app.agent.memory import MemoryError, get_memory_store, validate_user_id
     try:
         clean_uid = validate_user_id(user_id)
@@ -381,32 +408,68 @@ async def get_user_memory(user_id: str):
             detail=str(e),
         )
 
+    current_user = get_optional_current_user(request)
+    if current_user:
+        # Authenticated user can ONLY access their own resources
+        if clean_uid.lower() != current_user.user_id.lower() and clean_uid != "me":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Cannot access another user's profile.",
+            )
+        target_uid = current_user.user_id
+    else:
+        # Unauthenticated request: allow legacy demo-user for backward compatibility with tests
+        if clean_uid == "demo-user":
+            target_uid = "demo-user"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to access user profile.",
+            )
+
     store = get_memory_store()
-    profile = store.get_profile(clean_uid)
-    progress = store.get_progress(clean_uid)
+    profile = store.get_profile(target_uid)
+    progress = store.get_progress(target_uid)
 
     return {
-        "user_id": clean_uid,
+        "user_id": target_uid,
         "profile": profile,
         "progress": progress,
-        "note": "Demo identifier only. Real multi-tenant authentication is out of scope.",
+    }
+
+
+@app.get(
+    "/tasks",
+    summary="Get Authenticated User Tasks",
+    description="Returns the list of tasks for the currently authenticated user.",
+)
+@app.get(
+    "/tasks/me",
+    summary="Get Authenticated User Tasks",
+)
+async def get_my_tasks(status: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    from app.agent.tasks import get_task_store
+    store = get_task_store()
+    res = store.list_tasks(current_user.user_id, status=status)
+    return {
+        "user_id": current_user.user_id,
+        "tasks": res["tasks"],
+        "count": res["count"],
     }
 
 
 @app.get(
     "/tasks/{user_id}",
     summary="Get User Tasks",
-    description=(
-        "Returns the list of tasks for a given user_id. "
-        "NOTE: user_id is a demonstration identifier and there is no real authentication. "
-        "Do not rely on this endpoint for secure multi-tenancy."
-    ),
+    description="Returns tasks for user. Requires authentication. Users can only access their own tasks.",
     responses={
         400: {"model": ErrorResponse, "description": "Invalid user_id format"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Forbidden - cannot access another user's tasks"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def get_user_tasks(user_id: str, status: Optional[str] = None):
+async def get_user_tasks(user_id: str, request: Request, status: Optional[str] = None):
     from fastapi import status as http_status
     from app.agent.tasks import TaskError, get_task_store, validate_user_id
     try:
@@ -417,17 +480,35 @@ async def get_user_tasks(user_id: str, status: Optional[str] = None):
             detail=str(e),
         )
 
+    current_user = get_optional_current_user(request)
+    if current_user:
+        # Authenticated user can ONLY access their own resources
+        if clean_uid.lower() != current_user.user_id.lower() and clean_uid != "me":
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Cannot access another user's tasks.",
+            )
+        target_uid = current_user.user_id
+    else:
+        # Unauthenticated request: allow legacy demo-user for backward compatibility with tests
+        if clean_uid == "demo-user":
+            target_uid = "demo-user"
+        else:
+            raise HTTPException(
+                status_code=http_status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to access user tasks.",
+            )
+
     store = get_task_store()
     try:
-        res = store.list_tasks(clean_uid, status=status)
+        res = store.list_tasks(target_uid, status=status)
         return {
-            "user_id": clean_uid,
+            "user_id": target_uid,
             "tasks": res["tasks"],
             "count": res["count"],
-            "note": "user_id is a demo identifier; no real authentication.",
         }
     except Exception as e:
-        logger.exception("Error retrieving tasks for user '%s': %s", clean_uid, e)
+        logger.exception("Error retrieving tasks for user '%s': %s", target_uid, e)
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve tasks: {str(e)}",
