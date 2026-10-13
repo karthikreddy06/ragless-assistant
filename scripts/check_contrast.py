@@ -12,37 +12,41 @@ def cr(c1, c2):
     return (l1 + 0.05) / (l2 + 0.05)
 
 pairs = [
-    ("Light: Body Text (#1C2F26) on Card Surface (#FFFFFF)", "#1C2F26", "#FFFFFF", "Text >= 4.5:1"),
-    ("Light: Body Text (#1C2F26) on Page Background (#F8F6F3)", "#1C2F26", "#F8F6F3", "Text >= 4.5:1"),
-    ("Light: Body Text (#1C2F26) on Chip Blush (#FBE9F0)", "#1C2F26", "#FBE9F0", "Text >= 4.5:1"),
-    ("Light: Muted Text (#415B4E) on Card Surface (#FFFFFF)", "#415B4E", "#FFFFFF", "Text >= 4.5:1"),
-    ("Light: Button Text (#FFFFFF) on Primary Button (#1A78C2)", "#FFFFFF", "#1A78C2", "Text >= 4.5:1"),
-    ("Light: Primary Text / Links (#115E9B) on Surface (#FFFFFF)", "#115E9B", "#FFFFFF", "Text >= 4.5:1"),
-    ("Light: Success Text (#286036) on Card Surface (#FFFFFF)", "#286036", "#FFFFFF", "Text >= 4.5:1"),
-    ("Light: Success Text (#286036) on Success Subtle (#EAF4ED)", "#286036", "#EAF4ED", "Text >= 4.5:1"),
-    ("Light: Warning Text (#943E15) on Card Surface (#FFFFFF)", "#943E15", "#FFFFFF", "Text >= 4.5:1"),
-    ("Light: Warning Text (#943E15) on Warning Subtle (#FDF0EA)", "#943E15", "#FDF0EA", "Text >= 4.5:1"),
-    ("Light: Danger Text (#A0272B) on Card Surface (#FFFFFF)", "#A0272B", "#FFFFFF", "Text >= 4.5:1"),
-    ("Light: Pink UI Border (#C05D87) on Blush Chip (#FBE9F0)", "#C05D87", "#FBE9F0", "UI Border >= 3.0:1"),
-    ("Light: Pink UI Border (#C05D87) on Card Surface (#FFFFFF)", "#C05D87", "#FFFFFF", "UI Border >= 3.0:1"),
-    ("Light: Card Border (#DDD7D0) on Page (#F8F6F3)", "#857C74", "#F8F6F3", "UI Border >= 3.0:1"),
-    ("Dark: Body Text (#F1F5F3) on Card Surface (#182C24)", "#F1F5F3", "#182C24", "Text >= 4.5:1"),
-    ("Dark: Body Text (#F1F5F3) on Page Background (#12201A)", "#F1F5F3", "#12201A", "Text >= 4.5:1"),
-    ("Dark: Muted Text (#A2BFB2) on Card Surface (#182C24)", "#A2BFB2", "#182C24", "Text >= 4.5:1"),
-    ("Dark: Button Text (#0E1B15) on Primary Button (#58A6E6)", "#0E1B15", "#58A6E6", "Text >= 4.5:1"),
-    ("Dark: Primary Link Text (#72B6ED) on Card Surface (#182C24)", "#72B6ED", "#182C24", "Text >= 4.5:1"),
-    ("Dark: Success Text (#68C47F) on Card Surface (#182C24)", "#68C47F", "#182C24", "Text >= 4.5:1"),
-    ("Dark: Warning Text (#F29C6D) on Card Surface (#182C24)", "#F29C6D", "#182C24", "Text >= 4.5:1"),
-    ("Dark: Danger Text (#F58585) on Card Surface (#182C24)", "#F58585", "#182C24", "Text >= 4.5:1"),
-    ("Dark: Pink UI Border (#B06588) on Dark Chip (#271B23)", "#B06588", "#271B23", "UI Border >= 3.0:1"),
-    ("Dark: Pink UI Border (#B06588) on Card Surface (#182C24)", "#B06588", "#182C24", "UI Border >= 3.0:1"),
-    ("Dark: Accent Pink Text (#F3AEC9) on Card Surface (#182C24)", "#F3AEC9", "#182C24", "Text >= 4.5:1"),
+    ("Light: Body Text (#0F172A) on Surface (#FFFFFF)", "#0F172A", "#FFFFFF", "Text >= 4.5:1"),
+    ("Light: Body Text (#0F172A) on Page (#F8FAFC)", "#0F172A", "#F8FAFC", "Text >= 4.5:1"),
+    ("Light: Muted Text (#64748B) on Surface (#FFFFFF)", "#64748B", "#FFFFFF", "Text >= 4.5:1"),
+    ("Light: Muted Text (#64748B) on Page (#F8FAFC)", "#64748B", "#F8FAFC", "Text >= 4.5:1"),
+    ("Light: Button Text (#FFFFFF) on Primary Accent (#2563EB)", "#FFFFFF", "#2563EB", "Text >= 4.5:1"),
+    ("Light: Primary Accent Link (#1D4ED8) on Surface (#FFFFFF)", "#1D4ED8", "#FFFFFF", "Text >= 4.5:1"),
+    ("Light: Verified/Green Text (#15803D) on Surface (#FFFFFF)", "#15803D", "#FFFFFF", "Text >= 4.5:1"),
+    ("Light: Verified/Green Text (#15803D) on Subtle Green (#F0FDF4)", "#15803D", "#F0FDF4", "Text >= 4.5:1"),
+    ("Light: Review/Amber Text (#B45309) on Surface (#FFFFFF)", "#B45309", "#FFFFFF", "Text >= 4.5:1"),
+    ("Light: Review/Amber Text (#B45309) on Subtle Amber (#FFFBEB)", "#B45309", "#FFFBEB", "Text >= 4.5:1"),
+    ("Light: Error/Red Text (#B91C1C) on Surface (#FFFFFF)", "#B91C1C", "#FFFFFF", "Text >= 4.5:1"),
+    ("Light: Error/Red Text (#B91C1C) on Subtle Red (#FEF2F2)", "#B91C1C", "#FEF2F2", "Text >= 4.5:1"),
+    ("Light: Focus Ring / Active Border (#2563EB) on Surface (#FFFFFF)", "#2563EB", "#FFFFFF", "UI Border >= 3.0:1"),
+    ("Light: Input Control Border (#7C8894) on Surface (#FFFFFF)", "#7C8894", "#FFFFFF", "UI Border >= 3.0:1"),
+
+    ("Dark: Body Text (#E5E7EB) on Surface (#111827)", "#E5E7EB", "#111827", "Text >= 4.5:1"),
+    ("Dark: Body Text (#E5E7EB) on Page (#0B1220)", "#E5E7EB", "#0B1220", "Text >= 4.5:1"),
+    ("Dark: Muted Text (#9CA3AF) on Surface (#111827)", "#9CA3AF", "#111827", "Text >= 4.5:1"),
+    ("Dark: Muted Text (#9CA3AF) on Page (#0B1220)", "#9CA3AF", "#0B1220", "Text >= 4.5:1"),
+    ("Dark: Button Text (#FFFFFF) on Primary Accent (#2563EB)", "#FFFFFF", "#2563EB", "Text >= 4.5:1"),
+    ("Dark: Primary Accent Text (#60A5FA) on Surface (#111827)", "#60A5FA", "#111827", "Text >= 4.5:1"),
+    ("Dark: Verified/Green Text (#4ADE80) on Surface (#111827)", "#4ADE80", "#111827", "Text >= 4.5:1"),
+    ("Dark: Verified/Green Text (#4ADE80) on Dark Green (#052E16)", "#4ADE80", "#052E16", "Text >= 4.5:1"),
+    ("Dark: Review/Amber Text (#FBBF24) on Surface (#111827)", "#FBBF24", "#111827", "Text >= 4.5:1"),
+    ("Dark: Review/Amber Text (#FBBF24) on Dark Amber (#451A03)", "#FBBF24", "#451A03", "Text >= 4.5:1"),
+    ("Dark: Error/Red Text (#F87171) on Surface (#111827)", "#F87171", "#111827", "Text >= 4.5:1"),
+    ("Dark: Error/Red Text (#F87171) on Dark Red (#450A0A)", "#F87171", "#450A0A", "Text >= 4.5:1"),
+    ("Dark: Focus Ring / Active Border (#3B82F6) on Surface (#111827)", "#3B82F6", "#111827", "UI Border >= 3.0:1"),
+    ("Dark: Input Control Border (#6B7280) on Surface (#111827)", "#6B7280", "#111827", "UI Border >= 3.0:1"),
 ]
 
-print(f"{'Item':<62} | {'Ratio':<8} | {'Standard':<18} | {'Status'}")
-print("-" * 100)
+print(f"{'Item':<64} | {'Ratio':<8} | {'Standard':<18} | {'Status'}")
+print("-" * 102)
 for label, c1, c2, std in pairs:
     ratio = cr(c1, c2)
     min_req = 4.5 if "4.5" in std else 3.0
     status = "PASS" if ratio >= min_req else "FAIL"
-    print(f"{label:<62} | {ratio:.2f}:1  | {std:<18} | {status}")
+    print(f"{label:<64} | {ratio:.2f}:1  | {std:<18} | {status}")

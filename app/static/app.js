@@ -5,22 +5,26 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Elements
+  // Header Elements
   const statusPill = document.getElementById("status-pill");
   const statusText = document.getElementById("status-text");
   const userIdInput = document.getElementById("user-id-input");
+
+  // Form Elements
   const agentForm = document.getElementById("agent-form");
   const goalInput = document.getElementById("goal-input");
   const runBtn = document.getElementById("run-btn");
   const chips = document.querySelectorAll(".chip");
 
+  // State Elements
+  const emptyStateCard = document.getElementById("empty-state-card");
   const workingCard = document.getElementById("working-card");
   const elapsedCounter = document.getElementById("elapsed-counter");
   const errorCard = document.getElementById("error-card");
   const errorTitle = document.getElementById("error-title");
   const errorMessage = document.getElementById("error-message");
 
-  const emptyStateCard = document.getElementById("empty-state-card");
+  // Results Elements
   const answerCard = document.getElementById("answer-card");
   const answerText = document.getElementById("answer-text");
   const verificationBadge = document.getElementById("verification-badge");
@@ -29,21 +33,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const unresolvedBox = document.getElementById("unresolved-box");
   const unresolvedList = document.getElementById("unresolved-list");
 
+  // Trace Elements
   const traceCard = document.getElementById("trace-card");
   const traceStepCount = document.getElementById("trace-step-count");
   const traceSteps = document.getElementById("trace-steps");
   const verificationChecks = document.getElementById("verification-checks");
 
+  // Evidence Elements
   const evidencePanel = document.getElementById("evidence-panel");
   const evidenceCount = document.getElementById("evidence-count");
   const evidenceMockBadge = document.getElementById("evidence-mock-badge");
   const sourcesList = document.getElementById("sources-list");
   const internalEvidence = document.getElementById("internal-evidence");
 
+  // Actions Elements
   const actionsPanel = document.getElementById("actions-panel");
   const memoryWritesList = document.getElementById("memory-writes-list");
   const tasksChangedList = document.getElementById("tasks-changed-list");
 
+  // Sidebar Elements
   const progressStatusBadge = document.getElementById("progress-status-badge");
   const progressCounts = document.getElementById("progress-counts");
   const progressPercent = document.getElementById("progress-percent");
@@ -54,8 +62,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const tasksContainer = document.getElementById("tasks-container");
   const tasksCountBadge = document.getElementById("tasks-count-badge");
 
+  // Stats Elements
+  const resultsFooterStats = document.getElementById("results-footer-stats");
   const statLatency = document.getElementById("stat-latency");
   const statLlmCalls = document.getElementById("stat-llm-calls");
+  const statAnswerMode = document.getElementById("stat-answer-mode");
   const statWebCalls = document.getElementById("stat-web-calls");
   const statModel = document.getElementById("stat-model");
 
@@ -75,6 +86,14 @@ document.addEventListener("DOMContentLoaded", () => {
         goalInput.focus();
       }
     });
+  });
+
+  // Keyboard shortcut: Ctrl+Enter or Cmd+Enter to submit
+  goalInput.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      agentForm.requestSubmit();
+    }
   });
 
   // User ID input changes
@@ -178,7 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const completed = progress.completed_count || 0;
       const percent = progress.progress_percentage || 0;
 
-      progressCounts.textContent = `${completed} / ${total} Completed`;
+      progressCounts.textContent = `${completed} of ${total} complete`;
       progressPercent.textContent = `${percent}%`;
       progressBarFill.style.width = `${percent}%`;
 
@@ -206,7 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (tasks.length === 0) {
         const emptyNotice = document.createElement("p");
-        emptyNotice.className = "empty-notice";
+        emptyNotice.className = "empty-hint";
         emptyNotice.textContent = "No tasks recorded for user.";
         tasksContainer.appendChild(emptyNotice);
         return;
@@ -214,10 +233,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       tasks.forEach((t) => {
         const card = document.createElement("div");
-        card.className = `task-card ${t.status === "done" ? "task-done" : "task-open"}`;
+        card.className = "task-item";
 
         const titleSpan = document.createElement("span");
-        titleSpan.className = "task-card-title";
+        titleSpan.className = "task-item-title";
         titleSpan.textContent = `#${t.id} ${t.title}`;
 
         const statusSpan = document.createElement("span");
@@ -266,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     evidencePanel.classList.add("hidden");
     actionsPanel.classList.add("hidden");
     if (refusalBanner) refusalBanner.classList.add("hidden");
-    answerCard.classList.remove("card-refusal");
+    if (resultsFooterStats) resultsFooterStats.classList.add("hidden");
   }
 
   function handleErrorResponse(status, errorData) {
@@ -291,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
     verificationBadge.textContent = isVerified ? "Verified" : "Needs Review";
     verificationBadge.className = `badge ${isVerified ? "badge-verified" : "badge-review"}`;
 
-    // Refusal handling
+    // Refusal handling: quiet neutral informational notice
     const unresolved = (data.verification && data.verification.unresolved) || [];
     const answerLower = (data.answer || "").toLowerCase();
     const isRefusal =
@@ -299,16 +318,15 @@ document.addEventListener("DOMContentLoaded", () => {
       answerLower.includes("could not find") ||
       answerLower.includes("no evidence found") ||
       answerLower.includes("not found in company records") ||
+      answerLower.includes("no matching record") ||
       answerLower.includes("cannot find");
 
     if (refusalBanner && refusalBannerText) {
       if (isRefusal) {
-        refusalBannerText.textContent = "Grounded Refusal: Information not present in verified database records.";
+        refusalBannerText.textContent = "No matching record in the company database.";
         refusalBanner.classList.remove("hidden");
-        answerCard.classList.add("card-refusal");
       } else {
         refusalBanner.classList.add("hidden");
-        answerCard.classList.remove("card-refusal");
       }
     }
 
@@ -327,7 +345,7 @@ document.addEventListener("DOMContentLoaded", () => {
       unresolvedBox.classList.add("hidden");
     }
 
-    // 2. Activity Trace
+    // 2. Activity Stepper
     const planSteps = (data.plan && data.plan.steps) || [];
     const toolResults = data.tool_results || [];
     traceStepCount.textContent = `${planSteps.length} step${planSteps.length === 1 ? "" : "s"}`;
@@ -339,24 +357,24 @@ document.addEventListener("DOMContentLoaded", () => {
     planSteps.forEach((step, idx) => {
       const tr = toolResults[idx] || {};
       const stepDiv = document.createElement("div");
-      stepDiv.className = "timeline-step";
+      stepDiv.className = "stepper-row";
 
       const stepNum = document.createElement("div");
-      stepNum.className = "step-num";
+      stepNum.className = "step-indicator";
       stepNum.textContent = String(idx + 1);
 
-      const stepBody = document.createElement("div");
-      stepBody.className = "step-body";
+      const stepContent = document.createElement("div");
+      stepContent.className = "step-content";
 
-      const stepHeader = document.createElement("div");
-      stepHeader.className = "step-header";
+      const stepMeta = document.createElement("div");
+      stepMeta.className = "step-meta";
 
       const toolSpan = document.createElement("span");
-      toolSpan.className = "step-tool";
+      toolSpan.className = "step-tool-name";
       toolSpan.textContent = step.tool;
 
       const sourceSpan = document.createElement("span");
-      sourceSpan.className = "step-source";
+      sourceSpan.className = "step-source-pill";
       sourceSpan.textContent = tr.source || "sqlite";
 
       const statusBadge = document.createElement("span");
@@ -364,29 +382,36 @@ document.addEventListener("DOMContentLoaded", () => {
       statusBadge.className = `badge ${success ? "badge-verified" : "badge-failed"}`;
       statusBadge.textContent = success ? "Success" : "Failed";
 
-      stepHeader.appendChild(toolSpan);
-      stepHeader.appendChild(sourceSpan);
-      stepHeader.appendChild(statusBadge);
+      stepMeta.appendChild(toolSpan);
+      stepMeta.appendChild(sourceSpan);
+      stepMeta.appendChild(statusBadge);
 
       if (tr.source === "mock") {
         const mockBadge = document.createElement("span");
         mockBadge.className = "badge badge-mock";
         mockBadge.textContent = "MOCK DATA";
-        stepHeader.appendChild(mockBadge);
+        stepMeta.appendChild(mockBadge);
+      }
+
+      if (tr.latency_ms !== undefined) {
+        const latSpan = document.createElement("span");
+        latSpan.className = "step-latency";
+        latSpan.textContent = `${tr.latency_ms}ms`;
+        stepMeta.appendChild(latSpan);
       }
 
       const stepDesc = document.createElement("p");
-      stepDesc.className = "step-desc";
+      stepDesc.className = "step-detail-text";
       const descText = step.operation
         ? `Operation: ${step.operation} ${step.args ? JSON.stringify(step.args) : ""}`
         : step.input || (step.args ? JSON.stringify(step.args) : "");
       stepDesc.textContent = descText;
 
-      stepBody.appendChild(stepHeader);
-      stepBody.appendChild(stepDesc);
+      stepContent.appendChild(stepMeta);
+      stepContent.appendChild(stepDesc);
 
       stepDiv.appendChild(stepNum);
-      stepDiv.appendChild(stepBody);
+      stepDiv.appendChild(stepContent);
       traceSteps.appendChild(stepDiv);
     });
 
@@ -397,19 +422,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     checks.forEach((chk) => {
       const chkDiv = document.createElement("div");
-      chkDiv.className = `check-item ${chk.passed ? "passed" : "failed"}`;
+      chkDiv.className = `check-row ${chk.passed ? "passed" : "failed"}`;
 
       const iconSpan = document.createElement("span");
-      iconSpan.className = "check-icon";
+      iconSpan.className = "check-row-icon";
       iconSpan.textContent = chk.passed ? "✓" : "✗";
 
       const textDiv = document.createElement("div");
+      textDiv.className = "check-row-body";
+
       const nameSpan = document.createElement("span");
-      nameSpan.className = "check-name";
+      nameSpan.className = "check-row-name";
       nameSpan.textContent = chk.name;
 
       const detailSpan = document.createElement("span");
-      detailSpan.className = "check-detail";
+      detailSpan.className = "check-row-detail";
       detailSpan.textContent = chk.detail;
 
       textDiv.appendChild(nameSpan);
@@ -483,7 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     } else {
       const noneP = document.createElement("p");
-      noneP.className = "empty-notice";
+      noneP.className = "empty-hint";
       noneP.textContent = "No external web sources used.";
       sourcesList.appendChild(noneP);
     }
@@ -538,7 +565,7 @@ document.addEventListener("DOMContentLoaded", () => {
       internalEvidence.appendChild(table);
     } else {
       const noneInternal = document.createElement("p");
-      noneInternal.className = "empty-notice";
+      noneInternal.className = "empty-hint";
       noneInternal.textContent = "No internal company records returned.";
       internalEvidence.appendChild(noneInternal);
     }
@@ -560,7 +587,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (hasActions) {
       memWrites.forEach((mw) => {
         const pill = document.createElement("div");
-        pill.className = "action-pill";
+        pill.className = "action-item";
         const label = document.createElement("span");
         label.textContent = `${mw.operation}: ${mw.item_or_field}`;
         const badge = document.createElement("span");
@@ -573,7 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       taskWrites.forEach((tw) => {
         const pill = document.createElement("div");
-        pill.className = "action-pill";
+        pill.className = "action-item";
         const label = document.createElement("span");
         label.textContent = `${tw.operation}: #${tw.task_id} "${tw.title}"`;
         const badge = document.createElement("span");
@@ -586,13 +613,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (memWrites.length === 0) {
         const none = document.createElement("p");
-        none.className = "empty-notice";
+        none.className = "empty-hint";
         none.textContent = "No memory writes executed.";
         memoryWritesList.appendChild(none);
       }
       if (taskWrites.length === 0) {
         const none = document.createElement("p");
-        none.className = "empty-notice";
+        none.className = "empty-hint";
         none.textContent = "No task writes executed.";
         tasksChangedList.appendChild(none);
       }
@@ -604,8 +631,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 5. Footer Stats
     statLatency.textContent = `${data.processing_time_ms || 0} ms`;
-    statLlmCalls.textContent = `${data.llm_calls_count || 0} calls`;
-    statWebCalls.textContent = `${data.web_calls_count || 0} calls`;
+    statLlmCalls.textContent = `${data.llm_calls_count || 0}`;
+    if (statAnswerMode) statAnswerMode.textContent = data.answer_mode || "llm";
+    statWebCalls.textContent = `${data.web_calls_count || 0}`;
     statModel.textContent = `${data.llm_provider || "ollama"} · ${data.llm_model || "qwen2.5:3b"}`;
+    if (resultsFooterStats) resultsFooterStats.classList.remove("hidden");
   }
 });
