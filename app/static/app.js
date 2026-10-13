@@ -1,7 +1,7 @@
 /**
  * RAGless Web UI Client
  * Strictly adheres to security guidelines: ALL model/web/stored data rendered
- * exclusively via textContent (zero innerHTML of dynamic content).
+ * exclusively via textContent (zero innerHTML/outerHTML of dynamic content).
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -14,9 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const agentForm = document.getElementById("agent-form");
   const goalInput = document.getElementById("goal-input");
   const runBtn = document.getElementById("run-btn");
-  const chips = document.querySelectorAll(".chip");
+  const promptButtons = document.querySelectorAll("[data-prompt]");
 
   // State Elements
+  const welcomeSection = document.getElementById("welcome-section");
   const emptyStateCard = document.getElementById("empty-state-card");
   const workingCard = document.getElementById("working-card");
   const elapsedCounter = document.getElementById("elapsed-counter");
@@ -77,10 +78,10 @@ document.addEventListener("DOMContentLoaded", () => {
   checkHealth();
   refreshUserState();
 
-  // Chips suggestion clicks
-  chips.forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const prompt = chip.getAttribute("data-prompt");
+  // Suggestion prompt buttons (both composer chips and welcome cards)
+  promptButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const prompt = btn.getAttribute("data-prompt");
       if (prompt) {
         goalInput.value = prompt;
         goalInput.focus();
@@ -109,9 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!question) return;
 
-    // Reset error & results
+    // Reset error, results, & welcome state
     hideError();
     hideResults();
+    if (welcomeSection) welcomeSection.classList.add("hidden");
     if (emptyStateCard) emptyStateCard.classList.add("hidden");
     startWorkingTimer();
 
@@ -232,10 +234,49 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (tasks.length === 0) {
-        const emptyNotice = document.createElement("p");
-        emptyNotice.className = "empty-hint";
-        emptyNotice.textContent = "No tasks recorded for user.";
-        tasksContainer.appendChild(emptyNotice);
+        const emptyWrapper = document.createElement("div");
+        emptyWrapper.className = "tasks-empty-state";
+
+        const emptyIcon = document.createElement("div");
+        emptyIcon.className = "tasks-empty-icon";
+        emptyIcon.setAttribute("aria-hidden", "true");
+
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("width", "24");
+        svg.setAttribute("height", "24");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "1.75");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+
+        const p1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p1.setAttribute("d", "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2");
+        const r1 = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        r1.setAttribute("x", "8");
+        r1.setAttribute("y", "2");
+        r1.setAttribute("width", "8");
+        r1.setAttribute("height", "4");
+        r1.setAttribute("rx", "1");
+        r1.setAttribute("ry", "1");
+
+        svg.appendChild(p1);
+        svg.appendChild(r1);
+        emptyIcon.appendChild(svg);
+
+        const hint = document.createElement("p");
+        hint.className = "empty-hint";
+        hint.textContent = "No tasks recorded for user.";
+
+        const subhint = document.createElement("p");
+        subhint.className = "empty-subhint";
+        subhint.textContent = "Tasks created by the agent will appear here.";
+
+        emptyWrapper.appendChild(emptyIcon);
+        emptyWrapper.appendChild(hint);
+        emptyWrapper.appendChild(subhint);
+        tasksContainer.appendChild(emptyWrapper);
         return;
       }
 
@@ -277,6 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showError(title, msg) {
+    if (welcomeSection) welcomeSection.classList.add("hidden");
     if (emptyStateCard) emptyStateCard.classList.add("hidden");
     errorTitle.textContent = title;
     errorMessage.textContent = msg;
@@ -308,6 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Render agent response safely
   function renderAgentResponse(data) {
+    if (welcomeSection) welcomeSection.classList.add("hidden");
     if (emptyStateCard) emptyStateCard.classList.add("hidden");
 
     // 1. Answer Card & Grounded Refusal
@@ -613,7 +656,7 @@ document.addEventListener("DOMContentLoaded", () => {
         label.textContent = `${tw.operation}: #${tw.task_id} "${tw.title}"`;
         const badge = document.createElement("span");
         badge.className = `badge ${tw.confirmed ? "badge-verified" : "badge-failed"}`;
-        badge.textContent = tw.confirmed ? "Confirmed" : "Unconfirmed";
+        badge.textContent = mw.confirmed ? "Confirmed" : "Unconfirmed";
         pill.appendChild(label);
         pill.appendChild(badge);
         tasksChangedList.appendChild(pill);

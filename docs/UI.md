@@ -1,7 +1,7 @@
 # RAGless Web UI Documentation
 
 ## 1. Overview
-The RAGless Web UI provides an honest, transparent single-page interface served directly by FastAPI at `/ui`. It features an elegant **Soft Pink & Sky Blue Marble** design on a **full-width page layout**, ensuring immediate clarity for agent planning steps, deterministic verifications, source provenance, and execution metrics.
+The RAGless Web UI provides an honest, transparent single-page interface served directly by FastAPI at `/ui`. It features an elegant **Soft Pink & Sky Blue Marble** design on a **full-screen dashboard layout**, ensuring immediate clarity for agent planning steps, deterministic verifications, source provenance, and execution metrics.
 
 ### Architectural Principles
 - **Zero Build Step**: Pure vanilla HTML5, CSS3, and JavaScript. No npm, Webpack, Vite, or bundle steps.
@@ -38,9 +38,9 @@ The visual style is inspired by dreamy, watercolor-marble art, blending soft pas
 | `--status-red-text` | `#991B1B` | Execution errors and failed check alerts (`#FEE2E2` bg) |
 
 ### 2.2 Background & Surfaces
-- **Watercolor-Marble Background**: A soft, organic blend of radial gradients (`#B9E5F5` sky blue, `#F4C6D8` soft pink, and `#F9E3EC` light blush) over a light `#FDF7FA` linear base. The wash is low-contrast and soft, ensuring 100% text legibility.
-- **Card Surfaces**: Pure white `#FFFFFF` cards with 1px `#EADBE5` borders and minimal subtle shadows (`0 1px 3px 0 rgba(56, 41, 54, 0.04)`).
-- **Corner Radii**: Rounded corners of `8–10px` (`8px` for inputs/badges, `10px` for cards).
+- **Watercolor-Marble Background**: A soft, organic blend of radial gradients (`#B9E5F5` sky blue, `#F4C6D8` soft pink, and `#F9E3EC` light blush) over a light `#FDF7FA` linear base. Gradients are placed around page edges, ensuring the central workspace remains high-contrast and legible.
+- **Card Surfaces**: Pure white `#FFFFFF` cards with 1px `#EADBE5` borders and minimal subtle shadows (`0 1px 3px 0 rgba(56, 41, 54, 0.04), 0 4px 12px 0 rgba(56, 41, 54, 0.02)`).
+- **Corner Radii**: Rounded corners of `8–12px` (`8px` for inputs/badges, `10px` for cards, `12px` for illustrations).
 
 ---
 
@@ -72,36 +72,50 @@ Every text and interactive element was mathematically evaluated for WCAG AA conf
 
 ---
 
-## 4. Full-Width Layout & Component States
+## 4. Full-Screen Dashboard Layout & Component Architecture
 
 ### 4.1 Full-Width Top Bar
-- Spans 100% of the viewport width with 24px side padding (16px on mobile).
-- Flat square logo mark displaying the letter **"R"** on pastel pink `#F4C6D8`.
+- Spans 100% of viewport width with 24px side padding (16px on mobile).
+- Flat square logo mark displaying the letter **"R"** on pastel pink `#F4C6D8` with `#C76B98` border.
 - "RAGless" in 600 weight with muted "Operations Agent" subtitle.
-- Right: Status pill in pale blue `#D9F1FA` (dot + active model, e.g. `ollama · qwen2.5:3b`) and compact User ID input.
-- **Fail-Safe Timeout**: Displays "Loading..." before first fetch; switches to "Unavailable" with an amber dot if the health endpoint fails or exceeds 4 seconds.
+- Right: Status pill in pale blue `#D9F1FA` (dot + active model, e.g. `ollama · qwen2.5:3b`) and User ID input (`demo-user`).
+- **Fail-Safe Timeout**: Displays "Loading..." initially; switches to "Unavailable" with an amber dot if `/health` fails or exceeds 4 seconds.
 
-### 4.2 Main Area (70% / 30% Grid)
-- **Left Column (70%)**:
-  - Input card: textarea + primary pastel pink `#F4C6D8` "Run Agent" button + muted **"Ctrl+Enter"** shortcut label.
-  - Example prompts on `#F9E3EC` light blush surface (quiet, neutral text buttons).
-  - Empty state: Single muted line (*"Ask about company data, your onboarding progress, or your tasks."*).
-  - Loading state: Thin indeterminate progress bar + live counter (*"Working... 3.2s"*).
-  - Results order:
-    1. **Answer card**: Large, readable text, status badge (`Verified` / `Needs Review`), plain bulleted unresolved items if present.
+### 4.2 Main Area (~70% Workspace / ~30% Sidebar Grid)
+- **Left Column (~70%)**:
+  - **Agent Query Composer**:
+    - Header with spark icon, title, and "Ctrl + Enter to run" shortcut badge.
+    - Spacious textarea (`min-height: 96px`, padding `14px 16px`).
+    - Quick prompts in light blush (`#F9E3EC`) with border `#EADBE5`.
+    - Primary pastel pink `#F4C6D8` "Run Agent" button with dark text `#382936` and `#C76B98` border.
+    - Loading state: indeterminate progress bar + live counter.
+  - **Polished Welcome Section** (`#welcome-section`):
+    - Appears before any query has run, filling the workspace thoughtfully instead of leaving empty space.
+    - "AI Operations Workspace" badge pill.
+    - Heading: *"Your operations, intelligently connected."*
+    - Subheading: *"Query company knowledge, review onboarding progress, and manage tasks with deterministic verification and verified evidence."*
+    - **3 Interactive Suggestion Cards**:
+      1. *First-Week Roadmap*: Prepare policies, schedules, & tools (`Prepare everything I need for my first week`)
+      2. *Remaining Onboarding*: Review pending steps & requirements (`What do I still need to do?`)
+      3. *Leave vs UK Statutory*: Compare company policy to UK minimum (`How does our annual leave compare to the UK statutory minimum?`)
+      *(Clicking any card populates the composer and focuses it).*
+    - **Tasteful Connected-Node AI Illustration**: Lightweight inline SVG illustrating connected policy, web research, memory, and task nodes around an operations core, with soft watercolor radial aura.
+    - Automatically hides when the agent runs or displays results/errors.
+  - **Results Order (when query completes)**:
+    1. **Answer card**: Large readable text, status badge (`Verified` / `Needs Review`), plain bulleted unresolved items if present.
     2. **Refusal notice**: Informational neutral notice in pale blue stating *"No matching record in the company database."*
-    3. **Agent activity stepper**: Tool name, success/failure icon, provenance badge (`sqlite`, `web`, `mock`), per-step latency (if present), and verification checks grid below.
-    4. **Evidence panel**: Collapsible panel (collapsed by default) with external links, snippet quotes, and SQLite records. `MOCK DATA` badge appears if mock results are present.
+    3. **Agent activity stepper**: Tool name, success/failure status, provenance badge (`sqlite`, `web`, `mock`), per-step latency, and verification checks.
+    4. **Evidence panel**: Collapsible panel with external web links, snippet quotes, and SQLite records table. `MOCK DATA` badge appears if mock results are present.
     5. **Actions card**: Confirmed memory writes and task changes.
     6. **Results footer**: Thin stats row (duration, LLM calls, answer mode, web calls, model).
-- **Right Rail (30% Sticky)**:
-  - Sticky below the top bar on desktop, stacking below 900px.
-  - **Onboarding progress**: 4px progress bar with accent fill (strictly **empty at 0%**, never full), "N of M complete", and key-value role/department rows.
-  - **Tasks**: Compact task list with open/completed indicators and total count badge.
+- **Right Rail (~30% Sticky)**:
+  - Sticky below the top bar on desktop (`position: sticky; top: 76px;`).
+  - **Onboarding progress**: 6px progress bar with accent fill (strictly empty at 0%), "N of M complete", bold percentage, and key-value role/department rows.
+  - **Tasks**: Count badge in header, structured task list with status badges, and clean empty state with clipboard icon and concise explanation when no tasks exist.
 
 ### 4.3 Page Footer
-- Spans full width with a single muted line summarizing architecture guarantees:
-  *"Deterministic multi-step execution · Parameterized SQLite · Taint isolation"*.
+- Spans full width at viewport bottom using `margin-top: auto`.
+- Summary of architecture guarantees: *"Deterministic multi-step execution · Parameterized SQLite · Taint isolation"*.
 
 ---
 
@@ -110,5 +124,6 @@ Every text and interactive element was mathematically evaluated for WCAG AA conf
 Automated rule verification via `python scripts/verify_responsive.py`:
 - **1920px & 1440px (Wide Desktop)**: Full monitor width, 70% left column, 30% sticky right rail, 24px gutters, no horizontal scroll.
 - **1024px (Tablet Landscape)**: Two-column layout preserving minimum 320px right rail.
-- **768px (Tablet Portrait)**: Stacks into a single column at ≤900px.
+- **768px (Tablet Portrait)**: Stacks into a single column at ≤900px (`grid-template-columns: 1fr`, welcome section reflows cleanly).
 - **375px (Mobile Phone)**: 16px side padding; top bar controls, input footer, and stat items reflow cleanly with zero horizontal scroll.
+- **Motion Accessibility**: Full support for `prefers-reduced-motion: reduce`.

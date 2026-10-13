@@ -34,12 +34,22 @@
       </div>
     </header>
 
-    <!-- Full-Width Main Area: 70% / 30% Grid -->
+    <!-- Full-Width Main Area: ~70% Workspace / ~30% Sidebar Grid -->
     <main class="main-content">
-      <!-- Left Column (70%): Input + Results -->
+      <!-- Left Column: Workspace (~70%) -->
       <div class="primary-column">
-        <!-- Input Card -->
-        <section class="card input-card" aria-label="Objective Input">
+        <!-- 1. Query Composer Card -->
+        <section class="card composer-card" aria-label="Objective Input">
+          <div class="composer-header">
+            <div class="composer-title-group">
+              <svg class="header-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
+              <h2 class="composer-heading">Agent Query Composer</h2>
+            </div>
+            <span class="shortcut-pill" aria-hidden="true">Press Ctrl + Enter to run</span>
+          </div>
+
           <form id="agent-form" class="agent-form">
             <div class="input-container">
               <label for="goal-input" class="sr-only">Enter objective or question</label>
@@ -48,7 +58,7 @@
 
             <div class="input-footer">
               <div class="suggestions-group" aria-label="Example prompts">
-                <span class="suggestions-label">Suggestions:</span>
+                <span class="suggestions-label">Quick Prompts:</span>
                 <button type="button" class="chip prompt-btn" data-prompt="Prepare everything I need for my first week">First week</button>
                 <button type="button" class="chip prompt-btn" data-prompt="What do I still need to do?">Remaining onboarding</button>
                 <button type="button" class="chip prompt-btn" data-prompt="Create tasks for my onboarding">Create onboarding tasks</button>
@@ -57,35 +67,145 @@
 
               <div class="action-group">
                 <button type="submit" id="run-btn" class="btn btn-primary">
+                  <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
                   <span>Run Agent</span>
                 </button>
-                <span class="shortcut-hint" aria-hidden="true">Ctrl+Enter</span>
               </div>
             </div>
           </form>
 
-          <!-- Loading State: Thin Indeterminate Bar + Live Counter -->
+          <!-- Loading State: Indeterminate Bar + Live Counter -->
           <div id="working-card" class="working-state hidden" aria-live="polite">
             <div class="progress-bar-track" aria-hidden="true">
               <div class="progress-bar-indeterminate"></div>
             </div>
             <div class="working-meta">
-              <span class="working-label">Working...</span>
+              <span class="working-label">Executing multi-step plan...</span>
               <span id="elapsed-counter" class="working-timer">0.0s</span>
             </div>
           </div>
-
-          <!-- Empty State: One Quiet Muted Line -->
-          <p id="empty-state-card" class="empty-state-line">Ask about company data, your onboarding progress, or your tasks.</p>
         </section>
 
-        <!-- Error Card (Neutral Bordered Notice) -->
+        <!-- 2. Polished Welcome Section (Shown when no active result/error) -->
+        <section id="welcome-section" class="card welcome-card" aria-label="Welcome Overview">
+          <div class="welcome-content">
+            <div class="welcome-text-col">
+              <div class="welcome-badge">
+                <span class="badge-dot" aria-hidden="true"></span>
+                <span>AI Operations Workspace</span>
+              </div>
+              <h1 class="welcome-title">Your operations, intelligently connected.</h1>
+              <p class="welcome-description">
+                Query company knowledge, review onboarding progress, and manage tasks with deterministic verification and verified evidence.
+              </p>
+
+              <!-- 3 Compact Suggestion Cards -->
+              <div class="welcome-suggestions-grid">
+                <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="Prepare everything I need for my first week">
+                  <div class="suggestion-icon-wrap icon-blush" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </div>
+                  <div class="suggestion-text">
+                    <span class="suggestion-title">First-Week Roadmap</span>
+                    <span class="suggestion-subtitle">Prepare policies, schedules, & tools</span>
+                  </div>
+                  <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+
+                <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="What do I still need to do?">
+                  <div class="suggestion-icon-wrap icon-blue" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                  </div>
+                  <div class="suggestion-text">
+                    <span class="suggestion-title">Remaining Onboarding</span>
+                    <span class="suggestion-subtitle">Review pending steps & requirements</span>
+                  </div>
+                  <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+
+                <button type="button" class="welcome-suggestion-card prompt-btn" data-prompt="How does our annual leave compare to the UK statutory minimum?">
+                  <div class="suggestion-icon-wrap icon-pink" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                  </div>
+                  <div class="suggestion-text">
+                    <span class="suggestion-title">Leave vs UK Statutory</span>
+                    <span class="suggestion-subtitle">Compare company policy to UK minimum</span>
+                  </div>
+                  <svg class="suggestion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tasteful Connected-Node AI Illustration -->
+            <div class="welcome-visual-col" aria-hidden="true">
+              <div class="illustration-backdrop">
+                <svg class="network-svg" viewBox="0 0 260 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Decorative Connections -->
+                  <path d="M60 70 L130 110 L200 65" stroke="#EADBE5" stroke-width="2" stroke-dasharray="3 3"/>
+                  <path d="M130 110 L75 165" stroke="#EADBE5" stroke-width="2"/>
+                  <path d="M130 110 L195 160" stroke="#EADBE5" stroke-width="2"/>
+                  <path d="M60 70 L75 165" stroke="#B9E5F5" stroke-width="1.5" stroke-dasharray="2 2"/>
+                  <path d="M200 65 L195 160" stroke="#F4C6D8" stroke-width="1.5" stroke-dasharray="2 2"/>
+
+                  <!-- Outer Orbit Pulse -->
+                  <circle cx="130" cy="110" r="48" stroke="#F9E3EC" stroke-width="1.5"/>
+                  <circle cx="130" cy="110" r="68" stroke="#D9F1FA" stroke-width="1" stroke-dasharray="4 4"/>
+
+                  <!-- Peripheral Node 1: Policy / Knowledge -->
+                  <circle cx="60" cy="70" r="18" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
+                  <circle cx="60" cy="70" r="8" fill="#B9E5F5"/>
+
+                  <!-- Peripheral Node 2: Web Research -->
+                  <circle cx="200" cy="65" r="18" fill="#FFFFFF" stroke="#F4C6D8" stroke-width="2"/>
+                  <circle cx="200" cy="65" r="8" fill="#F4C6D8"/>
+
+                  <!-- Peripheral Node 3: Memory / Profile -->
+                  <circle cx="75" cy="165" r="18" fill="#FFFFFF" stroke="#F9E3EC" stroke-width="2"/>
+                  <circle cx="75" cy="165" r="8" fill="#C76B98"/>
+
+                  <!-- Peripheral Node 4: Task Execution -->
+                  <circle cx="195" cy="160" r="18" fill="#FFFFFF" stroke="#B9E5F5" stroke-width="2"/>
+                  <circle cx="195" cy="160" r="8" fill="#796B79"/>
+
+                  <!-- Center Core Node: Operations Agent -->
+                  <circle cx="130" cy="110" r="26" fill="#FDF7FA" stroke="#C76B98" stroke-width="2.5"/>
+                  <circle cx="130" cy="110" r="14" fill="#F4C6D8"/>
+                  <circle cx="130" cy="110" r="5" fill="#382936"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Legacy hook element for backward compatibility with tests/scripts -->
+        <span id="empty-state-card" class="sr-only">Ask about company data, your onboarding progress, or your tasks.</span>
+
+        <!-- 3. Error Card -->
         <section id="error-card" class="notice notice-error hidden" role="alert">
           <div class="notice-icon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
           <div class="notice-content">
@@ -94,22 +214,27 @@
           </div>
         </section>
 
-        <!-- Results in Specific Order -->
+        <!-- 4. Results Region (Displayed when agent responds) -->
         <div id="results-region" class="results-region" role="region" aria-label="Agent Results">
-          <!-- 1. Answer Card -->
+          <!-- Answer Card (Most Prominent Result) -->
           <section id="answer-card" class="card answer-card hidden">
             <div class="card-header">
-              <h2 id="answer-card-title" class="card-title">Answer</h2>
+              <div class="card-title-group">
+                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <h2 id="answer-card-title" class="card-title">Answer</h2>
+              </div>
               <div id="verification-badge" class="badge"></div>
             </div>
 
-            <!-- Refusal Notice (Informational Neutral Banner) -->
+            <!-- Refusal Banner -->
             <div id="refusal-banner" class="notice notice-info hidden">
               <div class="notice-icon" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
                 </svg>
               </div>
               <div class="notice-content">
@@ -125,10 +250,15 @@
             </div>
           </section>
 
-          <!-- 2. Agent Activity Stepper -->
+          <!-- Agent Activity Stepper -->
           <section id="trace-card" class="card trace-card hidden">
             <div class="card-header">
-              <h2 class="card-title">Agent activity</h2>
+              <div class="card-title-group">
+                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <h2 class="card-title">Agent activity</h2>
+              </div>
               <span id="trace-step-count" class="badge badge-neutral"></span>
             </div>
 
@@ -143,10 +273,19 @@
             </div>
           </section>
 
-          <!-- 3. Evidence Panel (Collapsed) -->
+          <!-- Evidence Panel (Collapsed) -->
           <details id="evidence-panel" class="card collapsible-card hidden">
             <summary class="panel-summary">
-              <span class="summary-title">Evidence & sources</span>
+              <div class="card-title-group">
+                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                <span class="summary-title">Evidence & sources</span>
+              </div>
               <div class="summary-meta">
                 <span id="evidence-count" class="badge badge-neutral"></span>
                 <span id="evidence-mock-badge" class="badge badge-mock hidden">MOCK DATA</span>
@@ -164,10 +303,15 @@
             </div>
           </details>
 
-          <!-- 4. Actions Panel -->
+          <!-- Actions Panel -->
           <section id="actions-panel" class="card actions-card hidden">
             <div class="card-header">
-              <h2 class="card-title">State modifications</h2>
+              <div class="card-title-group">
+                <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                <h2 class="card-title">State modifications</h2>
+              </div>
             </div>
             <div class="actions-grid">
               <div class="action-column">
@@ -181,7 +325,7 @@
             </div>
           </section>
 
-          <!-- 5. Results Thin Stat Footer Row -->
+          <!-- Results Stats Footer Row -->
           <div id="results-footer-stats" class="results-stats-row hidden">
             <span class="stat-cell"><span class="stat-name">Duration</span> <span id="stat-latency" class="stat-val">-</span></span>
             <span class="stat-cell"><span class="stat-name">LLM calls</span> <span id="stat-llm-calls" class="stat-val">-</span></span>
@@ -192,12 +336,18 @@
         </div>
       </div>
 
-      <!-- Right Rail (30% Sticky): Onboarding Progress & Tasks -->
+      <!-- Right Column: Sidebar (~30% Sticky) -->
       <aside class="sidebar-column">
-        <!-- Onboarding Progress -->
+        <!-- Onboarding Progress Card -->
         <section class="card sidebar-card" aria-labelledby="progress-heading">
           <div class="card-header">
-            <h2 id="progress-heading" class="card-title">Onboarding progress</h2>
+            <div class="card-title-group">
+              <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <h2 id="progress-heading" class="card-title">Onboarding progress</h2>
+            </div>
             <span id="progress-status-badge" class="badge badge-neutral">Loading...</span>
           </div>
           <div class="progress-body">
@@ -206,7 +356,7 @@
               <span id="progress-percent" class="progress-percent">0%</span>
             </div>
             <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-              <div id="progress-bar-fill" class="progress-fill" style="width: 0%;"></div>
+              <div id="progress-bar-fill" class="progress-fill"></div>
             </div>
             <div class="profile-rows">
               <div class="profile-row">
@@ -224,12 +374,27 @@
         <!-- Tasks Card -->
         <section class="card sidebar-card" aria-labelledby="tasks-heading">
           <div class="card-header">
-            <h2 id="tasks-heading" class="card-title">Tasks</h2>
+            <div class="card-title-group">
+              <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 11l3 3L22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+              <h2 id="tasks-heading" class="card-title">Tasks</h2>
+            </div>
             <span id="tasks-count-badge" class="badge badge-neutral">0</span>
           </div>
           <div class="tasks-body">
             <div id="tasks-container" class="tasks-list">
-              <p class="empty-hint">No tasks recorded for user.</p>
+              <div class="tasks-empty-state">
+                <div class="tasks-empty-icon" aria-hidden="true">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                  </svg>
+                </div>
+                <p class="empty-hint">No tasks recorded for user.</p>
+                <p class="empty-subhint">Tasks created by the agent will appear here.</p>
+              </div>
             </div>
           </div>
         </section>
