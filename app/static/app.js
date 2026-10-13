@@ -156,10 +156,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Health check
+  // Health check with timeout
   async function checkHealth() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
     try {
-      const res = await fetch("/health");
+      const res = await fetch("/health", { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         const provider = data.provider || "ollama";
@@ -167,12 +171,13 @@ document.addEventListener("DOMContentLoaded", () => {
         statusText.textContent = `${provider} · ${model}`;
         statusPill.className = "status-pill status-ready";
       } else {
-        statusText.textContent = "Service degraded";
-        statusPill.className = "status-pill status-error";
+        statusText.textContent = "Unavailable";
+        statusPill.className = "status-pill status-unavailable";
       }
     } catch {
-      statusText.textContent = "Offline";
-      statusPill.className = "status-pill status-error";
+      clearTimeout(timeoutId);
+      statusText.textContent = "Unavailable";
+      statusPill.className = "status-pill status-unavailable";
     }
   }
 
@@ -185,7 +190,10 @@ document.addEventListener("DOMContentLoaded", () => {
   async function fetchMemory(userId) {
     try {
       const res = await fetch(`/memory/${encodeURIComponent(userId)}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        progressStatusBadge.textContent = "Unavailable";
+        return;
+      }
       const data = await res.json();
       const profile = data.profile || {};
       const progress = data.progress || {};
@@ -195,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const total = progress.total_items || 0;
       const completed = progress.completed_count || 0;
-      const percent = progress.progress_percentage || 0;
+      const percent = total > 0 ? (progress.progress_percentage || 0) : 0;
 
       progressCounts.textContent = `${completed} of ${total} complete`;
       progressPercent.textContent = `${percent}%`;
@@ -205,7 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
       progressStatusBadge.textContent = status.replace("_", " ");
       progressStatusBadge.className = status === "completed" ? "badge badge-verified" : "badge badge-neutral";
     } catch {
-      // Ignore background refresh errors
+      progressStatusBadge.textContent = "Unavailable";
     }
   }
 
