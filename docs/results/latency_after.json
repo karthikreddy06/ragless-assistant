@@ -1,0 +1,737 @@
+{
+  "timestamp": "2026-10-13 11:04:30",
+  "model": "qwen2.5:3b",
+  "provider": "ollama",
+  "runs": [
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "How many employees are in AI?",
+      "run": 1,
+      "answer_mode": "template",
+      "llm_calls_count": 0,
+      "llm_latency_ms": null,
+      "processing_time_ms": 8.73,
+      "total_measured_time_ms": 8.79,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "How many employees are in AI?",
+      "run": 2,
+      "answer_mode": "template",
+      "llm_calls_count": 0,
+      "llm_latency_ms": null,
+      "processing_time_ms": 5.25,
+      "total_measured_time_ms": 5.28,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "How many employees are in AI?",
+      "run": 3,
+      "answer_mode": "template",
+      "llm_calls_count": 0,
+      "llm_latency_ms": null,
+      "processing_time_ms": 2.63,
+      "total_measured_time_ms": 2.65,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "Where is the company located?",
+      "run": 1,
+      "answer_mode": "template",
+      "llm_calls_count": 0,
+      "llm_latency_ms": null,
+      "processing_time_ms": 2.79,
+      "total_measured_time_ms": 2.81,
+      "verified": true,
+      "answer": "TechNova is located in Hyderabad."
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "Where is the company located?",
+      "run": 2,
+      "answer_mode": "template",
+      "llm_calls_count": 0,
+      "llm_latency_ms": null,
+      "processing_time_ms": 2.5,
+      "total_measured_time_ms": 2.53,
+      "verified": true,
+      "answer": "TechNova is located in Hyderabad."
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "Where is the company located?",
+      "run": 3,
+      "answer_mode": "template",
+      "llm_calls_count": 0,
+      "llm_latency_ms": null,
+      "processing_time_ms": 3.25,
+      "total_measured_time_ms": 3.29,
+      "verified": true,
+      "answer": "TechNova is located in Hyderabad."
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        14311.9,
+        3593.02
+      ],
+      "processing_time_ms": 17923.51,
+      "total_measured_time_ms": 17923.56,
+      "verified": true,
+      "answer": "TechNova's annual leave is 24 days, which is 4 days less than the UK statutory minimum of 28 days.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        4291.53,
+        3540.62
+      ],
+      "processing_time_ms": 7843.73,
+      "total_measured_time_ms": 7843.83,
+      "verified": true,
+      "answer": "TechNova's annual leave entitlement is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "default_flags (fast_path=true, deterministic=true)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": true,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        4247.48,
+        3576.69
+      ],
+      "processing_time_ms": 7839.66,
+      "total_measured_time_ms": 7839.71,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "How many employees are in AI?",
+      "run": 1,
+      "answer_mode": "template",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        3410.46,
+        3516.75
+      ],
+      "processing_time_ms": 6938.53,
+      "total_measured_time_ms": 6938.62,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "How many employees are in AI?",
+      "run": 2,
+      "answer_mode": "template",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        3355.89,
+        3197.5
+      ],
+      "processing_time_ms": 6568.09,
+      "total_measured_time_ms": 6568.19,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "How many employees are in AI?",
+      "run": 3,
+      "answer_mode": "template",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        3559.8,
+        3230.2
+      ],
+      "processing_time_ms": 6799.72,
+      "total_measured_time_ms": 6799.78,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "Where is the company located?",
+      "run": 1,
+      "answer_mode": "template",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        3296.25,
+        3236.96
+      ],
+      "processing_time_ms": 6551.78,
+      "total_measured_time_ms": 6551.89,
+      "verified": true,
+      "answer": "TechNova is located in Hyderabad."
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "Where is the company located?",
+      "run": 2,
+      "answer_mode": "template",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        3284.9,
+        3273.52
+      ],
+      "processing_time_ms": 6570.48,
+      "total_measured_time_ms": 6570.52,
+      "verified": true,
+      "answer": "TechNova is located in Hyderabad."
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "Where is the company located?",
+      "run": 3,
+      "answer_mode": "template",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        3310.87,
+        3205.17
+      ],
+      "processing_time_ms": 6529.32,
+      "total_measured_time_ms": 6529.42,
+      "verified": true,
+      "answer": "TechNova is located in Hyderabad."
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        4317.51,
+        3180.08,
+        3494.26
+      ],
+      "processing_time_ms": 11005.6,
+      "total_measured_time_ms": 11005.65,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- [UK Statutory Leave Guidelines](https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        4265.2,
+        3182.32,
+        3533.57
+      ],
+      "processing_time_ms": 10992.21,
+      "total_measured_time_ms": 10992.28,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- [UK Statutory Leave Guidelines](https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "fast_path_off (fast_path=false, deterministic=true)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": true,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        4299.48,
+        3173.32,
+        3489.43
+      ],
+      "processing_time_ms": 10978.62,
+      "total_measured_time_ms": 10978.7,
+      "verified": true,
+      "answer": "TechNova's annual leave policy is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "How many employees are in AI?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 1,
+      "llm_latency_ms": [
+        2560.29
+      ],
+      "processing_time_ms": 2569.99,
+      "total_measured_time_ms": 2570.06,
+      "verified": true,
+      "answer": "80 employees are in the AI department."
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "How many employees are in AI?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 1,
+      "llm_latency_ms": [
+        2438.11
+      ],
+      "processing_time_ms": 2446.97,
+      "total_measured_time_ms": 2447.05,
+      "verified": true,
+      "answer": "80 employees are in the AI department."
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "How many employees are in AI?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 1,
+      "llm_latency_ms": [
+        2406.21
+      ],
+      "processing_time_ms": 2413.67,
+      "total_measured_time_ms": 2413.71,
+      "verified": true,
+      "answer": "80 employees are in the AI department."
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "Where is the company located?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 1,
+      "llm_latency_ms": [
+        2345.38
+      ],
+      "processing_time_ms": 2355.94,
+      "total_measured_time_ms": 2355.98,
+      "verified": true,
+      "answer": "Hyderabad"
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "Where is the company located?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 1,
+      "llm_latency_ms": [
+        2399.15
+      ],
+      "processing_time_ms": 2409.19,
+      "total_measured_time_ms": 2409.23,
+      "verified": true,
+      "answer": "The company is located in Hyderabad."
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "Where is the company located?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 1,
+      "llm_latency_ms": [
+        2457.21
+      ],
+      "processing_time_ms": 2467.54,
+      "total_measured_time_ms": 2467.6,
+      "verified": true,
+      "answer": "The company is located in Hyderabad."
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        4276.86,
+        3482.26
+      ],
+      "processing_time_ms": 7765.23,
+      "total_measured_time_ms": 7765.28,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        4295.67,
+        3514.47
+      ],
+      "processing_time_ms": 7821.41,
+      "total_measured_time_ms": 7821.46,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- [UK Statutory Leave Guidelines](https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "deterministic_answers_off (fast_path=true, deterministic=false)",
+      "fast_path_enabled": true,
+      "deterministic_answers_enabled": false,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 2,
+      "llm_latency_ms": [
+        4342.33,
+        3545.21
+      ],
+      "processing_time_ms": 7897.1,
+      "total_measured_time_ms": 7897.22,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "How many employees are in AI?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        3451.8,
+        3301.73,
+        2574.91
+      ],
+      "processing_time_ms": 9340.45,
+      "total_measured_time_ms": 9340.52,
+      "verified": true,
+      "answer": "There are 80 employees in the AI department."
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "How many employees are in AI?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        3461.54,
+        3228.71,
+        2521.01
+      ],
+      "processing_time_ms": 9222.93,
+      "total_measured_time_ms": 9223.01,
+      "verified": true,
+      "answer": "80 employees are in the AI department."
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "How many employees are in AI?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        3462.19,
+        3316.0,
+        2487.92
+      ],
+      "processing_time_ms": 9281.13,
+      "total_measured_time_ms": 9281.16,
+      "verified": true,
+      "answer": "80 employees are in the AI department."
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "Where is the company located?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        3392.37,
+        3278.69,
+        2398.59
+      ],
+      "processing_time_ms": 9081.09,
+      "total_measured_time_ms": 9081.18,
+      "verified": true,
+      "answer": "Hyderabad"
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "Where is the company located?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        3384.83,
+        3289.36,
+        2515.3
+      ],
+      "processing_time_ms": 9206.09,
+      "total_measured_time_ms": 9206.14,
+      "verified": true,
+      "answer": "The company is located in Hyderabad."
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "Where is the company located?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        3541.49,
+        3297.51,
+        2438.68
+      ],
+      "processing_time_ms": 9290.91,
+      "total_measured_time_ms": 9290.97,
+      "verified": true,
+      "answer": "The company is located in Hyderabad."
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 1,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        5423.47,
+        3684.41,
+        4728.78
+      ],
+      "processing_time_ms": 13850.99,
+      "total_measured_time_ms": 13851.09,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- [UK Statutory Leave Guidelines](https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 2,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        7067.7,
+        4433.9,
+        5209.25
+      ],
+      "processing_time_ms": 16723.43,
+      "total_measured_time_ms": 16723.47,
+      "verified": true,
+      "answer": "TechNova's annual leave entitlement is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "config": "all_flags_off (fast_path=false, deterministic=false)",
+      "fast_path_enabled": false,
+      "deterministic_answers_enabled": false,
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "run": 3,
+      "answer_mode": "llm",
+      "llm_calls_count": 3,
+      "llm_latency_ms": [
+        8255.4,
+        4778.69,
+        5736.33
+      ],
+      "processing_time_ms": 18786.66,
+      "total_measured_time_ms": 18786.89,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    }
+  ],
+  "summary": {
+    "default_flags (fast_path=true, deterministic=true)": {
+      "How many employees are in AI?": {
+        "avg_processing_time_ms": 5.54,
+        "avg_llm_calls_count": 0.0,
+        "avg_llm_call_latency_ms": 0.0,
+        "answer_modes": [
+          "template"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "Where is the company located?": {
+        "avg_processing_time_ms": 2.85,
+        "avg_llm_calls_count": 0.0,
+        "avg_llm_call_latency_ms": 0.0,
+        "answer_modes": [
+          "template"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "How does our annual leave compare to the UK statutory minimum?": {
+        "avg_processing_time_ms": 11202.3,
+        "avg_llm_calls_count": 2.0,
+        "avg_llm_call_latency_ms": 5593.54,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      }
+    },
+    "fast_path_off (fast_path=false, deterministic=true)": {
+      "How many employees are in AI?": {
+        "avg_processing_time_ms": 6768.78,
+        "avg_llm_calls_count": 2.0,
+        "avg_llm_call_latency_ms": 3378.43,
+        "answer_modes": [
+          "template"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "Where is the company located?": {
+        "avg_processing_time_ms": 6550.53,
+        "avg_llm_calls_count": 2.0,
+        "avg_llm_call_latency_ms": 3267.94,
+        "answer_modes": [
+          "template"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "How does our annual leave compare to the UK statutory minimum?": {
+        "avg_processing_time_ms": 10992.14,
+        "avg_llm_calls_count": 3.0,
+        "avg_llm_call_latency_ms": 3659.46,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      }
+    },
+    "deterministic_answers_off (fast_path=true, deterministic=false)": {
+      "How many employees are in AI?": {
+        "avg_processing_time_ms": 2476.88,
+        "avg_llm_calls_count": 1.0,
+        "avg_llm_call_latency_ms": 2468.2,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "Where is the company located?": {
+        "avg_processing_time_ms": 2410.89,
+        "avg_llm_calls_count": 1.0,
+        "avg_llm_call_latency_ms": 2400.58,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "How does our annual leave compare to the UK statutory minimum?": {
+        "avg_processing_time_ms": 7827.91,
+        "avg_llm_calls_count": 2.0,
+        "avg_llm_call_latency_ms": 3909.47,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      }
+    },
+    "all_flags_off (fast_path=false, deterministic=false)": {
+      "How many employees are in AI?": {
+        "avg_processing_time_ms": 9281.5,
+        "avg_llm_calls_count": 3.0,
+        "avg_llm_call_latency_ms": 3089.53,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "Where is the company located?": {
+        "avg_processing_time_ms": 9192.7,
+        "avg_llm_calls_count": 3.0,
+        "avg_llm_call_latency_ms": 3059.65,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      },
+      "How does our annual leave compare to the UK statutory minimum?": {
+        "avg_processing_time_ms": 16453.69,
+        "avg_llm_calls_count": 3.0,
+        "avg_llm_call_latency_ms": 5479.77,
+        "answer_modes": [
+          "llm"
+        ],
+        "runs_count": 3,
+        "all_verified": true
+      }
+    }
+  }
+}

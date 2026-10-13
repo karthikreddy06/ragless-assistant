@@ -35,6 +35,15 @@ logger = logging.getLogger(__name__)
 MAX_AGENT_STEPS = 8
 MAX_REPLAN_ATTEMPTS = 1
 
+DETERMINISTIC_ANSWERS_ENABLED: bool = os.getenv("DETERMINISTIC_ANSWERS_ENABLED", "true").lower() in ("true", "1", "yes")
+SYNTHESIS_MAX_TOKENS: int = int(os.getenv("SYNTHESIS_MAX_TOKENS", "512"))
+
+
+def is_deterministic_answers_enabled() -> bool:
+    """Check dynamic runtime environment variable value for deterministic template answers."""
+    val = os.getenv("DETERMINISTIC_ANSWERS_ENABLED", "true")
+    return val.strip().lower() in ("true", "1", "yes")
+
 
 class AgentOrchestrator:
     """
@@ -252,6 +261,7 @@ class AgentOrchestrator:
 
             # Step 5: Grounded Answer Synthesis
             company_name = get_current_company_name()
+            answer_mode = "llm"
             if not all_evidence:
                 if web_used:
                     answer = "I could not find or verify information about that from external research sources."
@@ -261,18 +271,29 @@ class AgentOrchestrator:
                         f"{company_name}'s knowledge base only contains company details (name, location, total employees), "
                         f"department headcounts, leave policies, and onboarding checklist items."
                     )
+                answer_mode = "llm"
             else:
-                try:
-                    answer = self._synthesize_grounded_answer(
-                        question=clean_q,
-                        evidence=all_evidence,
-                        company_name=company_name,
-                        sources=sources,
-                        llm_client=counting_llm,
-                    )
-                except Exception as e:
-                    logger.warning("Answer synthesis LLM error: %s. Using deterministic fallback.", e)
-                    answer = self._format_deterministic_answer(all_evidence, company_name, sources=sources)
+                template_ans = None
+                if is_deterministic_answers_enabled():
+                    template_ans = self._format_single_fact_template_answer(clean_q, all_evidence, company_name)
+
+                if template_ans is not None:
+                    answer = template_ans
+                    answer_mode = "template"
+                else:
+                    try:
+                        answer = self._synthesize_grounded_answer(
+                            question=clean_q,
+                            evidence=all_evidence,
+                            company_name=company_name,
+                            sources=sources,
+                            llm_client=counting_llm,
+                        )
+                        answer_mode = "llm"
+                    except Exception as e:
+                        logger.warning("Answer synthesis LLM error: %s. Using deterministic fallback.", e)
+                        answer = self._format_deterministic_answer(all_evidence, company_name, sources=sources)
+                        answer_mode = "template"
 
             # Step 6: Deterministic Verification (No LLM calls)
             verification = self.verifier.verify(
@@ -303,6 +324,7 @@ class AgentOrchestrator:
                 web_used=web_used,
                 sources=sources if sources else None,
                 web_calls_count=run_context.web_calls_count if web_used else 0,
+                answer_mode=answer_mode,
             )
         finally:
             if orig_planner_llm is not None and hasattr(self.planner, "llm"):
@@ -367,7 +389,7 @@ User Question: {question}
 
 Answer:"""
 
-        ans = active_llm.generate_text(prompt=prompt, temperature=0.1)
+        ans = active_llm.generate_text(prompt=prompt, temperature=0.1, max_tokens=SYNTHESIS_MAX_TOKENS)
         ans_clean = ans.strip()
 
         # If web research was performed and sources exist, guarantee source attribution appears in answer
@@ -376,6 +398,65 @@ Answer:"""
             ans_clean += sources_block
 
         return ans_clean
+
+    def _format_single_fact_template_answer(
+        self,
+        question: str,
+        evidence: List[Dict[str, Any]],
+        company_name: str,
+    ) -> Optional[str]:
+        """
+        Produces a deterministic template answer for single-fact company_knowledge results
+        ONLY IF trivial and fully grounded.
+        Returns None if evidence is not a single known fact or if template is not applicable.
+        NOTE: When answer_mode="template", no LLM generation was performed; the answer is a
+        deterministic template over verified facts. Never present template answers as LLM or Nemotron reasoning.
+        """
+        if len(evidence) != 1:
+            return None
+
+        item = evidence[0]
+        item_type = item.get("type") or item.get("source_type")
+
+        # 1. Department headcount
+        if item_type == "department":
+            dept = item.get("name") or item.get("department")
+            emp = item.get("employees")
+            if dept and emp is not None:
+                return f"There are {emp} employees in the {dept} department."
+
+        # 2. Company location
+        if item_type == "company" and item.get("key") == "location":
+            val = item.get("value")
+            if val:
+                return f"{company_name} is located in {val}."
+
+        # 3. Company name
+        if item_type == "company" and item.get("key") == "name":
+            val = item.get("value")
+            if val:
+                return f"The company name is {val}."
+
+        # 4. Company total employees
+        if item_type == "company" and item.get("key") == "employees":
+            val = item.get("value")
+            if val:
+                return f"{company_name} has a total of {val} employees."
+
+        # 5. Leave policy days
+        if item_type == "leave_policy":
+            lt = item.get("leave_type")
+            days = item.get("days")
+            if lt and days is not None:
+                return f"Employees receive {days} days of {lt}."
+
+        # 6. Department total
+        if item_type == "department_total":
+            tot = item.get("total_department_employees") or item.get("employees")
+            if tot is not None:
+                return f"There are {tot} total employees across all departments."
+
+        return None
 
     def _format_deterministic_answer(
         self,

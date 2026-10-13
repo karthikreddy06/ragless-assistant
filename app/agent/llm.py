@@ -96,6 +96,7 @@ class LLMClient(ABC):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Generate a natural-language text response."""
         pass
@@ -106,6 +107,7 @@ class LLMClient(ABC):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Generate a structured JSON response."""
         pass
@@ -140,17 +142,23 @@ class OllamaClient(LLMClient):
         system: Optional[str] = None,
         json_format: bool = False,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         base_url = get_base_url()
         url = f"{base_url}/api/generate"
+
+        options_dict: Dict[str, Any] = {
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            options_dict["num_predict"] = max_tokens
 
         payload: Dict[str, Any] = {
             "model": self._model,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": temperature,
-            },
+            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
+            "options": options_dict,
         }
 
         if system:
@@ -188,16 +196,18 @@ class OllamaClient(LLMClient):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
-        return self._call(prompt=prompt, system=system, json_format=False, temperature=temperature)
+        return self._call(prompt=prompt, system=system, json_format=False, temperature=temperature, max_tokens=max_tokens)
 
     def generate_json(
         self,
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
-        return self._call(prompt=prompt, system=system, json_format=True, temperature=temperature)
+        return self._call(prompt=prompt, system=system, json_format=True, temperature=temperature, max_tokens=max_tokens)
 
 
 # ==============================================================================
@@ -254,6 +264,7 @@ class NebiusClient(LLMClient):
         system: Optional[str] = None,
         json_format: bool = False,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         url = f"{self._base_url}/chat/completions"
         headers = {
@@ -271,6 +282,8 @@ class NebiusClient(LLMClient):
             "messages": messages,
             "temperature": temperature,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
 
         if json_format:
             payload["response_format"] = {"type": "json_object"}
@@ -358,12 +371,14 @@ class NebiusClient(LLMClient):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         return self._call_chat_completions(
             prompt=prompt,
             system=system,
             json_format=False,
             temperature=temperature,
+            max_tokens=max_tokens,
         )
 
     def generate_json(
@@ -371,12 +386,14 @@ class NebiusClient(LLMClient):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         return self._call_chat_completions(
             prompt=prompt,
             system=system,
             json_format=True,
             temperature=temperature,
+            max_tokens=max_tokens,
         )
 
 
@@ -403,9 +420,13 @@ class CountingLLMClient(LLMClient):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         t0 = time.perf_counter()
-        res = self._inner.generate_text(prompt=prompt, system=system, temperature=temperature)
+        try:
+            res = self._inner.generate_text(prompt=prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+        except TypeError:
+            res = self._inner.generate_text(prompt=prompt, system=system, temperature=temperature)
         latency = round((time.perf_counter() - t0) * 1000, 2)
         if self._run_context is not None:
             self._run_context.record_llm_call(latency)
@@ -416,9 +437,13 @@ class CountingLLMClient(LLMClient):
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> str:
         t0 = time.perf_counter()
-        res = self._inner.generate_json(prompt=prompt, system=system, temperature=temperature)
+        try:
+            res = self._inner.generate_json(prompt=prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+        except TypeError:
+            res = self._inner.generate_json(prompt=prompt, system=system, temperature=temperature)
         latency = round((time.perf_counter() - t0) * 1000, 2)
         if self._run_context is not None:
             self._run_context.record_llm_call(latency)

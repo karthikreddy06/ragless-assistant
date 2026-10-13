@@ -318,15 +318,74 @@ def execute_structured_retrieval(
     return (data if data else None), op.intent, op.query_type
 
 
-def process_query(question: str) -> Dict[str, Any]:
+def detect_query_fast_path(
+    question: str,
+    known_departments: List[str],
+    known_leave_types: List[str],
+) -> Optional[QueryPlan]:
+    """
+    Deterministic fast-path for query engine planning on clear single-fact company questions.
+    Routes into the SAME validated QueryOperation definitions (allowlisted, parameterized).
+    """
+    q_lower = question.strip().lower()
+
+    # Reject external comparison queries from fast-path
+    if any(re.search(pat, q_lower) for pat in [r"\b(?:compare|comparison|uk|statutory|industry|market|external|benchmark|vs|versus)\b"]):
+        return None
+
+    # Compound queries (joining multiple topics with conjunctions) must fall through to LLM planner
+    if re.search(r"\b(?:and|also|plus|as\s+well\s+as)\b", q_lower):
+        return None
+
+    # 1. Company location
+    if re.search(r"\b(?:where\s+is\s+(?:the\s+)?company(?:\s+located)?|company\s+location|where\s+are\s+we\s+located|what\s+is\s+(?:the\s+)?(?:company\s+)?(?:office\s+)?location|where\s+is\s+(?:the\s+)?office)\b", q_lower):
+        return QueryPlan(queries=[QueryOperation(intent="company_info", query_type="company_location", entity="location")])
+
+    # 2. Company name
+    if re.search(r"\b(?:what\s+is\s+(?:the\s+)?company\s+name|what\s+is\s+our\s+company\s+name|what\s+is\s+the\s+name\s+of\s+the\s+company|what\s+company\s+is\s+this|who\s+do\s+i\s+work\s+for)\b", q_lower):
+        return QueryPlan(queries=[QueryOperation(intent="company_info", query_type="company_name", entity="name")])
+
+    # 3. Department headcount (matched against actual database values)
+    matched_depts = [
+        d for d in known_departments
+        if re.search(rf"\b{re.escape(d.lower())}\b", q_lower)
+    ]
+    if len(matched_depts) == 1:
+        dept = matched_depts[0]
+        if re.search(r"\b(?:how\s+many\s+(?:people|employees)|headcount|number\s+of\s+employees|how\s+large\s+is|team\s+size|size\s+of\s+(?:the\s+)?|workforce|how\s+many\s+in)\b", q_lower):
+            return QueryPlan(queries=[QueryOperation(intent="department_employees", query_type="dept_headcount", entity=dept)])
+
+    # 4. Total employees
+    if not matched_depts and re.search(r"\b(?:how\s+many\s+(?:total\s+)?employees(?:\s+are\s+there)?|total\s+employees|total\s+headcount|total\s+workforce|how\s+many\s+people\s+work\s+at\s+(?:the\s+)?company)\b", q_lower):
+        return QueryPlan(queries=[QueryOperation(intent="company_info", query_type="company_employees", entity="employees")])
+
+    # 5. Leave days (matched against actual database values)
+    matched_leaves = [
+        lt for lt in known_leave_types
+        if re.search(rf"\b{re.escape(lt.lower())}\b", q_lower)
+        or re.search(rf"\b{re.escape(lt.lower().replace(' leave', '').strip())}\b", q_lower)
+    ]
+    if len(matched_leaves) == 1:
+        leave = matched_leaves[0]
+        if re.search(r"\b(?:how\s+many\s+(?:days|leave\s+days)|days\s+of|leave\s+allowance|leave\s+days|how\s+much\s+leave|allowance)\b", q_lower):
+            return QueryPlan(queries=[QueryOperation(intent="leave_policy", query_type="leave_days", entity=leave)])
+
+    # 6. List onboarding items
+    if re.search(r"\b(?:list\s+(?:the\s+)?onboarding\s+items|what\s+are\s+(?:the\s+)?onboarding\s+(?:checklist\s+)?items|show\s+(?:the\s+)?onboarding\s+items|view\s+(?:the\s+)?onboarding\s+items|onboarding\s+checklist\s+items)\b", q_lower):
+        return QueryPlan(queries=[QueryOperation(intent="onboarding", query_type="onboarding_checklist", entity=None)])
+
+    return None
+
+
+def process_query(question: str, generate_answer: bool = True, allow_fast_path: bool = False) -> Dict[str, Any]:
     """
     Complete RAGless multi-query orchestration pipeline:
     1. Receive user natural-language question.
-    2. Decompose question into structured QueryPlan via local Ollama (qwen2.5:3b).
+    2. Decompose question into structured QueryPlan via local Ollama (qwen2.5:3b) or fast-path.
     3. Pass through Python validation layer to enforce allowlists and security boundaries.
     4. Execute safe predefined parameterized SQLite functions for each operation.
     5. Aggregate and tag structured records with source and domain types (zero cross-contamination).
-    6. Synthesize grounded final response with local Ollama using ONLY retrieved facts.
+    6. Synthesize grounded final response with local Ollama using ONLY retrieved facts (if generate_answer=True).
     7. Return response alongside transparent execution metadata.
     """
     start_time = time.perf_counter()
@@ -334,16 +393,21 @@ def process_query(question: str) -> Dict[str, Any]:
     known_depts = get_all_department_names()
     known_leaves = get_all_leave_types()
 
-    # Step 1: LLM query plan generation
-    raw_plan = generate_query_plan(question)
+    # Step 1: Query plan generation (deterministic fast-path or LLM)
+    query_plan = None
+    if allow_fast_path:
+        from app.agent.fast_path import is_fast_path_enabled
+        if is_fast_path_enabled():
+            query_plan = detect_query_fast_path(question, known_depts, known_leaves)
 
-    # Step 2: Python validation and refinement
-    query_plan = validate_and_refine_query_plan(
-        raw_plan=raw_plan,
-        question=question,
-        known_departments=known_depts,
-        known_leave_types=known_leaves,
-    )
+    if query_plan is None:
+        raw_plan = generate_query_plan(question)
+        query_plan = validate_and_refine_query_plan(
+            raw_plan=raw_plan,
+            question=question,
+            known_departments=known_depts,
+            known_leave_types=known_leaves,
+        )
 
     # Step 3: Execute predefined retrieval operations
     combined_data: List[Dict[str, Any]] = []
@@ -371,20 +435,23 @@ def process_query(question: str) -> Dict[str, Any]:
         resolved_intent = "unknown"
         resolved_query_type = "unknown"
 
-    # Step 5: Grounded answer generation using ONLY retrieved data
-    if combined_data:
-        answer = generate_grounded_answer(
-            question=question,
-            retrieved_data=combined_data,
-            intent=resolved_intent,
-        )
+    # Step 5: Grounded answer generation using ONLY retrieved data (skipped if generate_answer=False)
+    if generate_answer:
+        if combined_data:
+            answer = generate_grounded_answer(
+                question=question,
+                retrieved_data=combined_data,
+                intent=resolved_intent,
+            )
+        else:
+            company_name = get_current_company_name()
+            answer = (
+                f"I could not find information about that in the company database. "
+                f"{company_name}'s knowledge base only contains company details (name, location, total employees), "
+                f"department headcounts, leave policies, and onboarding checklist items."
+            )
     else:
-        company_name = get_current_company_name()
-        answer = (
-            f"I could not find information about that in the company database. "
-            f"{company_name}'s knowledge base only contains company details (name, location, total employees), "
-            f"department headcounts, leave policies, and onboarding checklist items."
-        )
+        answer = None
 
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 

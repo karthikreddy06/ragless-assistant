@@ -308,6 +308,10 @@ class AgentResponse(BaseModel):
         default=None, description="Sources cited from external web research"
     )
     web_calls_count: Optional[int] = Field(default=None, description="Count of web research calls executed")
+    answer_mode: Optional[Literal["template", "llm"]] = Field(
+        default=None,
+        description="Generation mode: 'template' for deterministic single-fact formatting, 'llm' for generative synthesis",
+    )
 
     @property
     def verified(self) -> bool:

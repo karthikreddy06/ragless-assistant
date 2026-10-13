@@ -745,7 +745,7 @@ class TestFastPathRouter(unittest.TestCase):
         self.assertEqual(p.steps[0].args["item_id"], 2)
 
     def test_fast_path_non_matching_falls_back_to_none(self):
-        p = detect_fast_path_plan("Where is the company located?")
+        p = detect_fast_path_plan("What is our quantum computing roadmap for 2030?")
         self.assertIsNone(p)
 
 

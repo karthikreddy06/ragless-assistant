@@ -1,0 +1,331 @@
+{
+  "timestamp": "2026-10-13 10:41:56",
+  "model": "qwen2.5:3b",
+  "provider": "ollama",
+  "runs": [
+    {
+      "question": "How many employees are in AI?",
+      "fast_path_enabled": true,
+      "run": 1,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        12842.18,
+        3352.51,
+        2669.47,
+        2459.66
+      ],
+      "processing_time_ms": 21363.84,
+      "total_measured_time_ms": 21365.21,
+      "verified": true,
+      "answer": "80 employees"
+    },
+    {
+      "question": "How many employees are in AI?",
+      "fast_path_enabled": true,
+      "run": 2,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3381.55,
+        3280.09,
+        2564.33,
+        2354.2
+      ],
+      "processing_time_ms": 11597.21,
+      "total_measured_time_ms": 11597.26,
+      "verified": true,
+      "answer": "80 employees"
+    },
+    {
+      "question": "How many employees are in AI?",
+      "fast_path_enabled": true,
+      "run": 3,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3452.17,
+        3265.56,
+        2479.19,
+        2323.05
+      ],
+      "processing_time_ms": 11538.79,
+      "total_measured_time_ms": 11538.86,
+      "verified": true,
+      "answer": "80 employees"
+    },
+    {
+      "question": "Where is the company located?",
+      "fast_path_enabled": true,
+      "run": 1,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3511.76,
+        3265.13,
+        2461.98,
+        2505.65
+      ],
+      "processing_time_ms": 11765.5,
+      "total_measured_time_ms": 11765.59,
+      "verified": true,
+      "answer": "The company is located in Hyderabad."
+    },
+    {
+      "question": "Where is the company located?",
+      "fast_path_enabled": true,
+      "run": 2,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3312.33,
+        3520.96,
+        2411.62,
+        2241.94
+      ],
+      "processing_time_ms": 11505.72,
+      "total_measured_time_ms": 11505.78,
+      "verified": true,
+      "answer": "Hyderabad"
+    },
+    {
+      "question": "Where is the company located?",
+      "fast_path_enabled": true,
+      "run": 3,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3380.18,
+        3249.85,
+        2431.25,
+        2310.23
+      ],
+      "processing_time_ms": 11388.11,
+      "total_measured_time_ms": 11388.18,
+      "verified": true,
+      "answer": "Hyderabad"
+    },
+    {
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "fast_path_enabled": true,
+      "run": 1,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        4514.35,
+        3211.31,
+        2554.99,
+        3641.05
+      ],
+      "processing_time_ms": 13943.68,
+      "total_measured_time_ms": 13943.74,
+      "verified": true,
+      "answer": "TechNova's annual leave entitlement is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "fast_path_enabled": true,
+      "run": 2,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        4287.32,
+        3199.4,
+        2527.87,
+        3503.99
+      ],
+      "processing_time_ms": 13539.71,
+      "total_measured_time_ms": 13539.79,
+      "verified": true,
+      "answer": "TechNova's annual leave is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "fast_path_enabled": true,
+      "run": 3,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        4211.96,
+        3266.16,
+        2581.92,
+        4653.7
+      ],
+      "processing_time_ms": 14727.48,
+      "total_measured_time_ms": 14727.57,
+      "verified": true,
+      "answer": "TechNova's annual leave is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "question": "How many employees are in AI?",
+      "fast_path_enabled": false,
+      "run": 1,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3368.33,
+        3294.1,
+        2373.39,
+        2430.23
+      ],
+      "processing_time_ms": 11480.91,
+      "total_measured_time_ms": 11480.96,
+      "verified": true,
+      "answer": "80 employees"
+    },
+    {
+      "question": "How many employees are in AI?",
+      "fast_path_enabled": false,
+      "run": 2,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3516.51,
+        3256.54,
+        2494.21,
+        2310.09
+      ],
+      "processing_time_ms": 11595.81,
+      "total_measured_time_ms": 11595.96,
+      "verified": true,
+      "answer": "80 employees"
+    },
+    {
+      "question": "How many employees are in AI?",
+      "fast_path_enabled": false,
+      "run": 3,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3427.38,
+        3268.79,
+        2501.02,
+        2319.34
+      ],
+      "processing_time_ms": 11535.22,
+      "total_measured_time_ms": 11535.27,
+      "verified": true,
+      "answer": "80 employees"
+    },
+    {
+      "question": "Where is the company located?",
+      "fast_path_enabled": false,
+      "run": 1,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3380.83,
+        3230.91,
+        2339.81,
+        2521.47
+      ],
+      "processing_time_ms": 11486.02,
+      "total_measured_time_ms": 11486.07,
+      "verified": true,
+      "answer": "The company is located in Hyderabad."
+    },
+    {
+      "question": "Where is the company located?",
+      "fast_path_enabled": false,
+      "run": 2,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3410.63,
+        3219.64,
+        2473.62,
+        2322.45
+      ],
+      "processing_time_ms": 11443.1,
+      "total_measured_time_ms": 11443.16,
+      "verified": true,
+      "answer": "Hyderabad"
+    },
+    {
+      "question": "Where is the company located?",
+      "fast_path_enabled": false,
+      "run": 3,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        3376.39,
+        3210.85,
+        2446.37,
+        2263.82
+      ],
+      "processing_time_ms": 11315.41,
+      "total_measured_time_ms": 11315.49,
+      "verified": true,
+      "answer": "Hyderabad"
+    },
+    {
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "fast_path_enabled": false,
+      "run": 1,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        4241.68,
+        3216.22,
+        2585.68,
+        3589.96
+      ],
+      "processing_time_ms": 13646.87,
+      "total_measured_time_ms": 13646.92,
+      "verified": true,
+      "answer": "TechNova's annual leave policy is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "fast_path_enabled": false,
+      "run": 2,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        4243.64,
+        3254.84,
+        2528.76,
+        3505.99
+      ],
+      "processing_time_ms": 13547.05,
+      "total_measured_time_ms": 13547.12,
+      "verified": true,
+      "answer": "TechNova's annual leave policy provides 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    },
+    {
+      "question": "How does our annual leave compare to the UK statutory minimum?",
+      "fast_path_enabled": false,
+      "run": 3,
+      "llm_calls_count": 4,
+      "llm_latency_ms": [
+        4287.69,
+        3266.72,
+        2514.93,
+        3537.56
+      ],
+      "processing_time_ms": 13625.65,
+      "total_measured_time_ms": 13625.71,
+      "verified": true,
+      "answer": "TechNova's annual leave policy is 24 days, which is less than the UK statutory minimum of 28 days for full-time workers.\n\nSources:\n- UK Statutory Leave Guidelines (https://gov.uk/annual-leave-entitlement)"
+    }
+  ],
+  "summary": {
+    "fast_path_true": {
+      "How many employees are in AI?": {
+        "avg_processing_time_ms": 14833.28,
+        "avg_llm_calls_count": 4.0,
+        "runs_count": 3
+      },
+      "Where is the company located?": {
+        "avg_processing_time_ms": 11553.11,
+        "avg_llm_calls_count": 4.0,
+        "runs_count": 3
+      },
+      "How does our annual leave compare to the UK statutory minimum?": {
+        "avg_processing_time_ms": 14070.29,
+        "avg_llm_calls_count": 4.0,
+        "runs_count": 3
+      }
+    },
+    "fast_path_false": {
+      "How many employees are in AI?": {
+        "avg_processing_time_ms": 11537.31,
+        "avg_llm_calls_count": 4.0,
+        "runs_count": 3
+      },
+      "Where is the company located?": {
+        "avg_processing_time_ms": 11414.84,
+        "avg_llm_calls_count": 4.0,
+        "runs_count": 3
+      },
+      "How does our annual leave compare to the UK statutory minimum?": {
+        "avg_processing_time_ms": 13606.52,
+        "avg_llm_calls_count": 4.0,
+        "runs_count": 3
+      }
+    }
+  }
+}

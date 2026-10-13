@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from typing import Any, Dict
 
@@ -7,6 +8,8 @@ from app.agent.llm import LLMClient
 from app.database import get_onboarding_items
 
 logger = logging.getLogger(__name__)
+
+PLANNER_MAX_TOKENS = int(os.getenv("PLANNER_MAX_TOKENS", "512"))
 
 
 def _build_checklist_catalog_prompt() -> str:
@@ -112,11 +115,19 @@ class AgentPlanner:
 
         user_prompt = f'User Question: "{question}"\n\nGenerate the plan in JSON:'
 
-        raw_response = self.llm.generate_json(
-            prompt=user_prompt,
-            system=system_prompt,
-            temperature=0.0,
-        )
+        try:
+            raw_response = self.llm.generate_json(
+                prompt=user_prompt,
+                system=system_prompt,
+                temperature=0.0,
+                max_tokens=PLANNER_MAX_TOKENS,
+            )
+        except TypeError:
+            raw_response = self.llm.generate_json(
+                prompt=user_prompt,
+                system=system_prompt,
+                temperature=0.0,
+            )
 
         return self._extract_json(raw_response)
 

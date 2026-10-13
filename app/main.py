@@ -56,6 +56,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     initialize_database()
     seed_database()
     logger.info("Database ready. Startup complete.")
+
+    warmup = os.getenv("WARMUP_ON_STARTUP", "false").lower() in ("true", "1", "yes")
+    import sys
+    is_testing = "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") is not None
+    if warmup and not is_testing:
+        logger.info("Performing startup warm-up call to Ollama (WARMUP_ON_STARTUP=true)...")
+        try:
+            from app.llm import _call_ollama_generate
+            _call_ollama_generate("Warmup ping", temperature=0.0)
+            logger.info("Ollama warm-up call completed successfully.")
+        except Exception as e:
+            logger.warning("Ollama warm-up call failed or skipped: %s", e)
+
     yield
     logger.info("Shutting down RAGless Knowledge Assistant API.")
 

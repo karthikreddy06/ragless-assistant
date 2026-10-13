@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from typing import Any, Dict, Optional
 import requests
 
@@ -183,7 +184,7 @@ class TestAgentExecutionAndVerification(unittest.TestCase):
     def setUp(self):
         from unittest.mock import patch
 
-        def fake_process_query(query: str):
+        def fake_process_query(query: str, *args, **kwargs):
             q = query.lower()
             if "engineering" in q:
                 return {"retrieved_data": None, "source": "sqlite"}
@@ -590,15 +591,97 @@ class TestLLMCallCountingAccuracy(unittest.TestCase):
 
         fake_client = MultiCallFakeClient()
         orchestrator = AgentOrchestrator(llm_client=fake_client)
-        with patch("app.agent.orchestrator.detect_fast_path_plan", return_value=None):
+        # With FAST_PATH_ENABLED=false and DETERMINISTIC_ANSWERS_ENABLED=false, 3 calls are made:
+        # 1. Agent planner (JSON)
+        # 2. Query engine planner (JSON)
+        # (Inner answer generation was removed in Step 1.1, so no redundant 3rd call)
+        # 3. Outer synthesis (Text)
+        with patch.dict(os.environ, {"FAST_PATH_ENABLED": "false", "DETERMINISTIC_ANSWERS_ENABLED": "false"}):
             resp = orchestrator.run("How many employees in AI?")
 
         self.assertEqual(resp.llm_calls_count, len(fake_client.calls))
-        self.assertEqual(resp.llm_calls_count, 4)
+        self.assertEqual(resp.llm_calls_count, 3)
+        self.assertEqual(resp.answer_mode, "llm")
         self.assertIsNotNone(resp.llm_latency_ms)
-        self.assertEqual(len(resp.llm_latency_ms), 4)
+        self.assertEqual(len(resp.llm_latency_ms), 3)
         for lat in resp.llm_latency_ms:
             self.assertGreaterEqual(lat, 0.0)
+
+    def test_company_knowledge_fast_path_and_template_zero_llm_calls(self):
+        """Step 1.2 & 1.3: Fast-path + template answers make exactly 0 LLM calls."""
+        fake_client = FakeLLMClient(plan_json="{}", text_response="")
+        orchestrator = AgentOrchestrator(llm_client=fake_client)
+        with patch.dict(os.environ, {"FAST_PATH_ENABLED": "true", "DETERMINISTIC_ANSWERS_ENABLED": "true"}):
+            resp = orchestrator.run("How many employees are in AI?")
+
+        self.assertEqual(resp.llm_calls_count, 0)
+        self.assertEqual(resp.answer_mode, "template")
+        self.assertIn("80", resp.answer)
+        self.assertTrue(resp.verification.passed)
+
+    def test_company_knowledge_fast_path_with_deterministic_answers_disabled(self):
+        """Step 1.3: When DETERMINISTIC_ANSWERS_ENABLED=false, synthesis runs via LLM (1 call)."""
+        fake_client = FakeLLMClient(plan_json="{}", text_response="There are 80 employees in the AI department.")
+        orchestrator = AgentOrchestrator(llm_client=fake_client)
+        with patch.dict(os.environ, {"FAST_PATH_ENABLED": "true", "DETERMINISTIC_ANSWERS_ENABLED": "false"}):
+            resp = orchestrator.run("How many employees are in AI?")
+
+        self.assertEqual(resp.llm_calls_count, 1)
+        self.assertEqual(resp.answer_mode, "llm")
+        self.assertIn("80", resp.answer)
+        self.assertTrue(resp.verification.passed)
+
+    def test_unsupported_engineering_refusal_never_produces_template(self):
+        """Step 1.3: Refusals ('Who is the head of Engineering?') still produce grounded refusal and never a template fact."""
+        fake_client = FakeLLMClient(
+            plan_json='{"goal": "Find Engineering head", "steps": [{"tool": "company_knowledge", "input": "Who is the head of Engineering?"}]}',
+            text_response="",
+        )
+        orchestrator = AgentOrchestrator(llm_client=fake_client)
+        with patch.dict(os.environ, {"FAST_PATH_ENABLED": "true", "DETERMINISTIC_ANSWERS_ENABLED": "true"}):
+            resp = orchestrator.run("Who is the head of Engineering?")
+
+        self.assertIn("could not find", resp.answer.lower())
+        self.assertEqual(resp.answer_mode, "llm")
+        self.assertTrue(resp.verification.passed)
+
+    def test_truncated_plan_json_handled_safely(self):
+        """Step 1.5: Truncated JSON from LLM planner is handled safely without 500 error."""
+        # Simulated truncated JSON
+        truncated_json = '{"goal": "Check headcount", "steps": [{"tool": "company_know'
+        fake_client = FakeLLMClient(plan_json=truncated_json, text_response="")
+        orchestrator = AgentOrchestrator(llm_client=fake_client)
+
+        with patch.dict(os.environ, {"FAST_PATH_ENABLED": "false"}):
+            resp = orchestrator.run("Who is the CEO of TechNova?")
+
+        self.assertIsNone(resp.plan)
+        self.assertIn("could not generate a valid plan", resp.answer.lower())
+        self.assertFalse(resp.verification.passed)
+        self.assertGreaterEqual(resp.processing_time_ms, 0.0)
+
+    def test_verifier_external_research_unavailable_no_leaked_none(self):
+        """Step 1.6: Failed external research unresolved list says 'External research was unavailable.' and never contains 'No evidence found in database for: 'None''."""
+        from app.agent.schemas import AgentPlan, PlanStep, ToolResult
+        from app.agent.verifier import Verifier
+
+        plan = AgentPlan(
+            goal="Research external benchmark",
+            steps=[PlanStep(tool="web_research", args={"query": "UK statutory leave", "max_results": 1})],
+        )
+        # Failed tool result with data=None
+        tool_results = [
+            ToolResult(tool="web_research", success=False, source="web", data=None, error="Search timeout")
+        ]
+        answer = "I could not find or verify information about that from external research sources."
+
+        verifier = Verifier()
+        v = verifier.verify("What is UK statutory leave?", plan, tool_results, answer)
+
+        self.assertIn("External research was unavailable.", v.unresolved)
+        for u in v.unresolved:
+            self.assertNotIn("No evidence found in database for: 'None'", u)
+            self.assertNotIn("'None'", u)
 
 
 if __name__ == "__main__":

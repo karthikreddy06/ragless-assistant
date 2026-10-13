@@ -4,7 +4,11 @@ import re
 from typing import Optional
 
 from app.agent.schemas import AgentPlan, PlanStep
-from app.database import get_onboarding_items
+from app.database import (
+    get_all_department_names,
+    get_all_leave_types,
+    get_onboarding_items,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +114,7 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
                         steps=[PlanStep(tool="memory", operation="mark_item_complete", args={"item_id": it["id"]})],
                     )
 
-    # 3. Profile queries
+    # 4. Profile queries
     profile_view_patterns = [
         r"\b(?:what\s+is\s+my|view\s+my|show\s+my|get\s+my)\s+profile\b",
         r"\bwho\s+am\s+i\b",
@@ -124,7 +128,7 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
                 steps=[PlanStep(tool="memory", operation="get_profile", args={})],
             )
 
-    # 4. Profile update patterns: e.g. "set my department to Backend", "my role is Engineer"
+    # 5. Profile update patterns: e.g. "set my department to Backend", "my role is Engineer"
     dept_match = re.search(r"\b(?:set\s+my\s+department\s+to|my\s+department\s+is)\s+([a-zA-Z\s]{2,30})\b", q_lower)
     role_match = re.search(r"\b(?:set\s+my\s+role\s+to|my\s+role\s+is)\s+([a-zA-Z\s]{2,30})\b", q_lower)
     if dept_match or role_match:
@@ -139,6 +143,109 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
         return AgentPlan(
             goal="Update user profile with specified role or department",
             steps=[PlanStep(tool="memory", operation="set_profile", args={"role": role, "department": dept})],
+        )
+
+    # 6. Company Knowledge Fast-Path (clear, unambiguous phrasings)
+    # Questions with external comparison/benchmark phrasings or compound requests MUST fall through to LLM planner
+    external_terms = [
+        r"\b(?:compare|comparison|uk|statutory|industry|market|external|benchmark|vs|versus)\b"
+    ]
+    if any(re.search(pat, q_lower) for pat in external_terms):
+        return None
+
+    # Compound queries (joining multiple topics with conjunctions) must fall through to LLM planner
+    if re.search(r"\b(?:and|also|plus|as\s+well\s+as)\b", q_lower):
+        return None
+
+    # (a) Company location
+    if re.search(
+        r"\b(?:where\s+is\s+(?:the\s+)?company(?:\s+located)?|company\s+location|where\s+are\s+we\s+located|what\s+is\s+(?:the\s+)?(?:company\s+)?(?:office\s+)?location|where\s+is\s+(?:the\s+)?office)\b",
+        q_lower,
+    ):
+        logger.info("Fast-path triggered: company location for '%s'", question)
+        return AgentPlan(
+            goal="Retrieve company location",
+            steps=[PlanStep(tool="company_knowledge", input=question)],
+        )
+
+    # (b) Company name
+    if re.search(
+        r"\b(?:what\s+is\s+(?:the\s+)?company\s+name|what\s+is\s+our\s+company\s+name|what\s+is\s+the\s+name\s+of\s+the\s+company|what\s+company\s+is\s+this|who\s+do\s+i\s+work\s+for)\b",
+        q_lower,
+    ):
+        logger.info("Fast-path triggered: company name for '%s'", question)
+        return AgentPlan(
+            goal="Retrieve company name",
+            steps=[PlanStep(tool="company_knowledge", input=question)],
+        )
+
+    # (c) "How many employees are in <known department>"
+    # Matches against database department values dynamically
+    try:
+        known_depts = get_all_department_names()
+    except Exception:
+        known_depts = []
+
+    matched_depts = [
+        d for d in known_depts
+        if re.search(rf"\b{re.escape(d.lower())}\b", q_lower)
+    ]
+    if len(matched_depts) == 1:
+        dept_name = matched_depts[0]
+        if re.search(
+            r"\b(?:how\s+many\s+(?:people|employees)|headcount|number\s+of\s+employees|how\s+large\s+is|team\s+size|size\s+of\s+(?:the\s+)?|workforce|how\s+many\s+in)\b",
+            q_lower,
+        ):
+            logger.info("Fast-path triggered: department headcount (%s) for '%s'", dept_name, question)
+            return AgentPlan(
+                goal=f"Retrieve headcount for {dept_name} department",
+                steps=[PlanStep(tool="company_knowledge", input=question)],
+            )
+
+    # (d) Total employees
+    if not matched_depts and re.search(
+        r"\b(?:how\s+many\s+(?:total\s+)?employees(?:\s+are\s+there)?|total\s+employees|total\s+headcount|total\s+workforce|how\s+many\s+people\s+work\s+at\s+(?:the\s+)?company)\b",
+        q_lower,
+    ):
+        logger.info("Fast-path triggered: total company employees for '%s'", question)
+        return AgentPlan(
+            goal="Retrieve total company headcount",
+            steps=[PlanStep(tool="company_knowledge", input=question)],
+        )
+
+    # (e) Leave days for a known leave type
+    # Matches against database leave types dynamically
+    try:
+        known_leaves = get_all_leave_types()
+    except Exception:
+        known_leaves = []
+
+    matched_leaves = [
+        lt for lt in known_leaves
+        if re.search(rf"\b{re.escape(lt.lower())}\b", q_lower)
+        or re.search(rf"\b{re.escape(lt.lower().replace(' leave', '').strip())}\b", q_lower)
+    ]
+    if len(matched_leaves) == 1:
+        leave_name = matched_leaves[0]
+        if re.search(
+            r"\b(?:how\s+many\s+(?:days|leave\s+days)|days\s+of|leave\s+allowance|leave\s+days|how\s+much\s+leave|allowance)\b",
+            q_lower,
+        ):
+            logger.info("Fast-path triggered: leave policy (%s) for '%s'", leave_name, question)
+            return AgentPlan(
+                goal=f"Retrieve leave policy allowance for {leave_name}",
+                steps=[PlanStep(tool="company_knowledge", input=question)],
+            )
+
+    # (f) List onboarding items
+    if re.search(
+        r"\b(?:list\s+(?:the\s+)?onboarding\s+items|what\s+are\s+(?:the\s+)?onboarding\s+(?:checklist\s+)?items|show\s+(?:the\s+)?onboarding\s+items|view\s+(?:the\s+)?onboarding\s+items|onboarding\s+checklist\s+items)\b",
+        q_lower,
+    ):
+        logger.info("Fast-path triggered: list onboarding items for '%s'", question)
+        return AgentPlan(
+            goal="List onboarding checklist items",
+            steps=[PlanStep(tool="company_knowledge", input=question)],
         )
 
     return None

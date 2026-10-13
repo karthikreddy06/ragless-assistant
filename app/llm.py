@@ -120,6 +120,7 @@ def _call_ollama_generate(prompt: str, json_format: bool = False, temperature: f
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
         "options": {
             "temperature": temperature,
         },

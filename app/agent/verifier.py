@@ -60,8 +60,12 @@ class Verifier:
                 has_any_data = True
                 self._collect_facts(tr.data, extracted_facts)
             else:
-                step_input = plan.steps[idx].input if idx < len(plan.steps) else "step"
-                unresolved.append(f"No evidence found in database for: '{step_input}'")
+                step = plan.steps[idx] if plan and idx < len(plan.steps) else None
+                if step is not None and step.tool == "web_research":
+                    unresolved.append("External research was unavailable.")
+                else:
+                    step_input = step.input if (step and step.input) else (step.operation if (step and step.operation) else "requested query")
+                    unresolved.append(f"No evidence found in database for: '{step_input}'")
 
         # 3. Grounding Check: When evidence is completely empty
         ans_lower = answer.lower()

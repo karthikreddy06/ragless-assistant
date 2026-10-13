@@ -35,7 +35,8 @@ def execute_company_knowledge(query_input: str) -> ToolResult:
     Unsupported/missing facts (e.g. Engineering dept) return success=True with data=None.
     """
     try:
-        engine_result = process_query(query_input)
+        from app.agent.fast_path import is_fast_path_enabled
+        engine_result = process_query(query_input, generate_answer=False, allow_fast_path=is_fast_path_enabled())
         retrieved_data = engine_result.get("retrieved_data")
 
         return ToolResult(
