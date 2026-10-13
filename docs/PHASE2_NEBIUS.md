@@ -1,8 +1,8 @@
-# Phase 2: Nebius Token Factory & NVIDIA Nemotron Integration
+# Cloud Provider: OpenAI-Compatible Client (Nebius / NVIDIA Models)
 
 ## 1. Overview
 
-In Phase 2, the **RAGless Assistant** integrates the **Nebius Token Factory** and **NVIDIA Nemotron** models through an extensible provider abstraction. The active LLM provider is switchable via environment configuration (`LLM_PROVIDER=ollama` or `LLM_PROVIDER=nebius`), routing both the outer agent planner, inner knowledge retrieval operations, and grounded answer synthesis through the chosen model.
+The **RAGless Assistant** includes an OpenAI-compatible cloud provider client (`NebiusClient`), unit-tested with mocks only. The active LLM provider is switchable via environment configuration (`LLM_PROVIDER=ollama` or `LLM_PROVIDER=nebius`), routing both the outer agent planner, inner knowledge retrieval operations, and grounded answer synthesis through the configured client.
 
 ---
 
@@ -14,7 +14,7 @@ In Phase 2, the **RAGless Assistant** integrates the **Nebius Token Factory** an
                ┌──────────────┴──────────────┐
                ▼                             ▼
        [ OllamaClient ]              [ NebiusClient ]
-       (Local qwen2.5:3b)      (NVIDIA Nemotron / Token Factory)
+       (Local qwen2.5:3b)      (OpenAI-compatible / mock-tested)
        http://localhost:11434   https://api.tokenfactory.nebius.com/v1/
                │                             │
                └──────────────┬──────────────┘
@@ -26,7 +26,7 @@ In Phase 2, the **RAGless Assistant** integrates the **Nebius Token Factory** an
         └──────────────────────────────────────────┘
 ```
 
-Both clients implement the common abstract base class [`LLMClient`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/app/agent/llm.py#L65):
+Both clients implement the common abstract base class [`LLMClient`](../app/agent/llm.py):
 - `provider_name -> str`
 - `model_name -> str`
 - `generate_text(prompt, system, temperature) -> str`
@@ -36,7 +36,7 @@ Both clients implement the common abstract base class [`LLMClient`](file:///c:/U
 
 ## 3. Configuration & How to Switch Providers
 
-Configuration is controlled entirely via environment variables (or `.env` file). See [`.env.example`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/.env.example) for a template.
+Configuration is controlled entirely via environment variables (or `.env` file). See [`.env.example`](../.env.example) for a template.
 
 ### To Run with Local Ollama (Default):
 ```bash
@@ -45,10 +45,10 @@ export OLLAMA_BASE_URL=http://localhost:11434
 export OLLAMA_MODEL=qwen2.5:3b
 ```
 
-### To Run with Nebius Token Factory (NVIDIA Nemotron):
+### To Run with OpenAI-Compatible Cloud Endpoint (Nebius / Other):
 ```bash
 export LLM_PROVIDER=nebius
-export NEBIUS_API_KEY="your-nebius-token-here"
+export NEBIUS_API_KEY="your-token-here"
 export NEBIUS_BASE_URL="https://api.tokenfactory.nebius.com/v1/"
 export NEBIUS_MODEL="nvidia/nemotron-3-super-120b-a12b"
 export LLM_TIMEOUT_SECONDS=30
@@ -61,11 +61,11 @@ export LLM_TEMPERATURE=0.0
 ## 4. Key Architectural Implementations
 
 ### 4.1 OpenAI Compatibility Without Heavy Dependencies
-[`NebiusClient`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/app/agent/llm.py#L150) connects directly to Nebius Token Factory's OpenAI-compatible endpoint (`/chat/completions`) using Python's standard `requests` library. No additional heavy SDKs or package upgrades are required.
+[`NebiusClient`](../app/agent/llm.py) connects directly to standard OpenAI-compatible endpoints (`/chat/completions`) using Python's standard `requests` library. No additional heavy SDKs or package upgrades are required.
 
 ### 4.2 Reasoning Token Stripping (`<think>...</think>`)
-NVIDIA Nemotron models may output internal reasoning traces wrapped in `<think>` and `</think>` tags.
-The function [`strip_reasoning()`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/app/agent/llm.py#L32) strips these blocks before JSON parsing and before returning final text, guaranteeing:
+Certain reasoning models may output internal reasoning traces wrapped in `<think>` and `</think>` tags.
+The function [`strip_reasoning()`](../app/agent/llm.py) strips these blocks before JSON parsing and before returning final text, guaranteeing:
 - JSON plan parsing is never corrupted by reasoning preambles.
 - Internal chain-of-thought traces never leak into user-facing responses.
 
@@ -74,8 +74,8 @@ When `generate_json()` is invoked, `NebiusClient` supplies `response_format={"ty
 
 ### 4.4 Secret Redaction & Zero Credential Leaks
 API keys are strictly shielded:
-- [`redact_secrets()`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/app/agent/llm.py#L24) masks any occurrence of the API key with `[REDACTED]` in error strings and logs.
-- Dedicated unit test in [`TestSecretRedaction`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/tests/test_nebius.py#L162) asserts that keys never appear in exceptions or responses.
+- [`redact_secrets()`](../app/agent/llm.py) masks any occurrence of the API key with `[REDACTED]` in error strings and logs.
+- Dedicated unit test in [`TestSecretRedaction`](../tests/test_nebius.py) asserts that keys never appear in exceptions or responses.
 - `.env` is ignored in `.gitignore`.
 
 ### 4.5 Resilient HTTP Retries & Backoff
@@ -89,4 +89,4 @@ To prevent intent drift (e.g., rewriting *"Who is the head of Engineering?"* int
 ## 5. Additive Diagnostics & Evidence
 
 1. **`GET /health`**: Additively reports `llm_provider`, `llm_model`, and `llm_healthy` without exposing keys or credentials.
-2. **`POST /agent/ask`**: Returns `llm_provider`, `llm_model`, and `llm_calls_count` in [`AgentResponse`](file:///c:/Users/M.Karthik%20Reddy/Documents/projects/ragless-assistant/app/agent/schemas.py#L118) for transparent per-request verification.
+2. **`POST /agent/ask`**: Returns `llm_provider`, `llm_model`, and `llm_calls_count` in [`AgentResponse`](../app/agent/schemas.py) for transparent per-request verification.

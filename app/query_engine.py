@@ -92,31 +92,41 @@ def validate_and_refine_query_plan(
                 )
 
     # Check known leave types
-    for lt in known_leave_types:
-        lt_clean = lt.lower().replace("leave", "").strip()
-        if lt_clean and re.search(rf"\b{re.escape(lt_clean)}\b", norm_q):
-            already_has_leave = any(
+    is_subgroup = any(
+        re.search(pat, norm_q)
+        for pat in [
+            r"\b(?:contractor|contractors|intern|interns|part-time|consultant|consultants|temporary|freelance|probation)\b"
+        ]
+    )
+    if is_subgroup:
+        # Database only contains company-wide standard policies; prune leave_policy queries for unsupported sub-groups
+        valid_ops = [op for op in valid_ops if op.intent != "leave_policy"]
+    else:
+        for lt in known_leave_types:
+            lt_clean = lt.lower().replace("leave", "").strip()
+            if lt_clean and re.search(rf"\b{re.escape(lt_clean)}\b", norm_q):
+                already_has_leave = any(
+                    op.intent == "leave_policy" and (
+                        (op.entity and lt_clean in op.entity.lower()) or op.query_type == "all_leaves"
+                    )
+                    for op in valid_ops
+                )
+                if not already_has_leave and len(valid_ops) < 5:
+                    valid_ops.append(
+                        QueryOperation(intent="leave_policy", query_type="leave_days", entity=lt)
+                    )
+
+        if any(w in norm_q for w in ["annual leave", "vacation allowance", "leave allowance", "annual leaves", "days do we get"]):
+            already_has_annual = any(
                 op.intent == "leave_policy" and (
-                    (op.entity and lt_clean in op.entity.lower()) or op.query_type == "all_leaves"
+                    (op.entity and "annual" in op.entity.lower()) or op.query_type == "all_leaves"
                 )
                 for op in valid_ops
             )
-            if not already_has_leave and len(valid_ops) < 5:
+            if not already_has_annual and len(valid_ops) < 5:
                 valid_ops.append(
-                    QueryOperation(intent="leave_policy", query_type="leave_days", entity=lt)
+                    QueryOperation(intent="leave_policy", query_type="leave_days", entity="Annual Leave")
                 )
-
-    if any(w in norm_q for w in ["annual leave", "vacation allowance", "leave allowance", "annual leaves", "days do we get"]):
-        already_has_annual = any(
-            op.intent == "leave_policy" and (
-                (op.entity and "annual" in op.entity.lower()) or op.query_type == "all_leaves"
-            )
-            for op in valid_ops
-        )
-        if not already_has_annual and len(valid_ops) < 5:
-            valid_ops.append(
-                QueryOperation(intent="leave_policy", query_type="leave_days", entity="Annual Leave")
-            )
 
     # Check company information
     if any(w in norm_q for w in ["organization", "organisation", "company name", "name of the company", "what is the company name", "what company is this", "what organization is this"]):
@@ -356,10 +366,15 @@ def detect_query_fast_path(
             return QueryPlan(queries=[QueryOperation(intent="department_employees", query_type="dept_headcount", entity=dept)])
 
     # 4. Total employees
-    if not matched_depts and re.search(r"\b(?:how\s+many\s+(?:total\s+)?employees(?:\s+are\s+there)?|total\s+employees|total\s+headcount|total\s+workforce|how\s+many\s+people\s+work\s+at\s+(?:the\s+)?company)\b", q_lower):
+    if not matched_depts and not re.search(r"\b(?:in|department|dept|team)\b", q_lower) and re.search(
+        r"\b(?:how\s+many\s+total\s+employees|total\s+employees|total\s+headcount|total\s+workforce|how\s+many\s+(?:people|employees)\s+work\s+at\s+(?:the\s+)?company|how\s+many\s+employees\s+does\s+(?:the\s+)?company\s+have)\b",
+        q_lower,
+    ):
         return QueryPlan(queries=[QueryOperation(intent="company_info", query_type="company_employees", entity="employees")])
 
     # 5. Leave days (matched against actual database values)
+    if any(re.search(pat, q_lower) for pat in [r"\b(?:contractor|intern|part-time|consultant|temporary|temp|probation)\b"]):
+        return None
     matched_leaves = [
         lt for lt in known_leave_types
         if re.search(rf"\b{re.escape(lt.lower())}\b", q_lower)

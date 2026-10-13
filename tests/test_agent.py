@@ -684,6 +684,48 @@ class TestLLMCallCountingAccuracy(unittest.TestCase):
             self.assertNotIn("'None'", u)
 
 
+class TestFastPathFalsePositives(unittest.TestCase):
+    """Step A1: Fast-path false positives and missing entity guards."""
+
+    def test_fast_path_false_positives_return_none(self):
+        from app.agent.fast_path import detect_fast_path_plan
+
+        queries = [
+            "Who is the head of the Engineering department?",
+            "How many employees are in Engineering?",
+            "How many employees are in AI and Backend?",
+            "What is the sick leave for contractors?",
+        ]
+        for q in queries:
+            plan = detect_fast_path_plan(q)
+            self.assertIsNone(plan, f"Query '{q}' should bypass fast-path and return None")
+
+    def test_template_answer_guards_against_contractor_qualifier(self):
+        orchestrator = AgentOrchestrator()
+        evidence = [
+            {
+                "source": "sqlite",
+                "type": "leave_policy",
+                "source_type": "leave_policy",
+                "leave_type": "Sick Leave",
+                "days": 12,
+            }
+        ]
+        res = orchestrator._format_single_fact_template_answer(
+            question="What is the sick leave for contractors?",
+            evidence=evidence,
+            company_name="TechNova",
+        )
+        self.assertIsNone(res, "Template answer must return None for questions asking about ungrounded sub-groups")
+
+    def test_query_engine_refinement_ignores_contractor_leave(self):
+        from app.query_engine import process_query
+
+        res = process_query("What is the sick leave for contractors?", generate_answer=False)
+        self.assertIsNone(res.get("retrieved_data"), "Query engine must not retrieve standard sick leave for contractors")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

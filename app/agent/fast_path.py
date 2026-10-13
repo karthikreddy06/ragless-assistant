@@ -203,8 +203,9 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
             )
 
     # (d) Total employees
-    if not matched_depts and re.search(
-        r"\b(?:how\s+many\s+(?:total\s+)?employees(?:\s+are\s+there)?|total\s+employees|total\s+headcount|total\s+workforce|how\s+many\s+people\s+work\s+at\s+(?:the\s+)?company)\b",
+    # Must explicitly ask for overall/total company headcount and NOT mention a department/sub-entity
+    if not matched_depts and not re.search(r"\b(?:in|department|dept|team)\b", q_lower) and re.search(
+        r"\b(?:how\s+many\s+total\s+employees|total\s+employees|total\s+headcount|total\s+workforce|how\s+many\s+(?:people|employees)\s+work\s+at\s+(?:the\s+)?company|how\s+many\s+employees\s+does\s+(?:the\s+)?company\s+have)\b",
         q_lower,
     ):
         logger.info("Fast-path triggered: total company employees for '%s'", question)
@@ -214,6 +215,10 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
         )
 
     # (e) Leave days for a known leave type
+    # Role qualifiers or contractor/intern leave questions must fall through to LLM planner
+    if any(re.search(pat, q_lower) for pat in [r"\b(?:contractor|intern|part-time|consultant|temporary|temp|probation)\b"]):
+        return None
+
     # Matches against database leave types dynamically
     try:
         known_leaves = get_all_leave_types()

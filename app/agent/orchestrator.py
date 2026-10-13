@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -413,6 +414,16 @@ Answer:"""
         deterministic template over verified facts. Never present template answers as LLM or Nemotron reasoning.
         """
         if len(evidence) != 1:
+            return None
+
+        # Never emit a template fact if the user question specifies worker sub-groups or qualifiers
+        # not represented in the verified database record
+        if any(
+            re.search(pat, question.lower())
+            for pat in [
+                r"\b(?:contractor|contractors|intern|interns|part-time|consultant|consultants|temporary|freelance|probation)\b"
+            ]
+        ):
             return None
 
         item = evidence[0]
