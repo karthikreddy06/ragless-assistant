@@ -178,7 +178,7 @@ The following table reflects all configuration options defined in [`.env.example
 | `LLM_PROVIDER` | `ollama` | Active LLM provider: `ollama` (default local) or `nebius` (cloud client) |
 | `NEBIUS_API_KEY` | `your_nebius_api_key_here` | API key for OpenAI-compatible cloud client |
 | `NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1/` | Base URL for OpenAI-compatible endpoint |
-| `NEBIUS_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Model identifier for cloud completions |
+| `NEBIUS_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Model identifier for cloud completions (unverified against provider's catalog; check via provider's models endpoint) |
 | `LLM_TIMEOUT_SECONDS`| `30` | Network timeout in seconds for cloud LLM requests |
 | `LLM_MAX_RETRIES` | `3` | Maximum retry attempts for transient cloud HTTP errors |
 | `LLM_TEMPERATURE` | `0.0` | Sampling temperature for LLM completions |

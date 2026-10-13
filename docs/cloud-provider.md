@@ -50,11 +50,12 @@ export OLLAMA_MODEL=qwen2.5:3b
 export LLM_PROVIDER=nebius
 export NEBIUS_API_KEY="your-token-here"
 export NEBIUS_BASE_URL="https://api.tokenfactory.nebius.com/v1/"
-export NEBIUS_MODEL="nvidia/nemotron-3-super-120b-a12b"
+export NEBIUS_MODEL="nvidia/nemotron-3-super-120b-a12b" # Unverified against provider catalog; check via models endpoint
 export LLM_TIMEOUT_SECONDS=30
 export LLM_MAX_RETRIES=3
 export LLM_TEMPERATURE=0.0
 ```
+*(Note: The default `NEBIUS_MODEL` identifier is unverified against the provider's active catalog and must be checked via the provider's `/models` endpoint before live use.)*
 
 ---
 

@@ -1,5 +1,8 @@
 # RAGless Assistant — Dynamic Knowledge Ingestion & Security Report
 
+> [!NOTE]
+> **Historical Artifact Notice**: This report records a historical evaluation run against an earlier version of the assistant, using the alternate NextGen AI dataset (`data/test_company.json`) specifically to test dynamic knowledge ingestion and schema replacement. These results reflect that past evaluation run and may not reflect the current code.
+
 **Evaluation Date**: October 5, 2026  
 **Evaluator**: Automated Verification Harness (`scripts/run_evaluation.py`)  
 **Backend Framework**: FastAPI + SQLite + Ollama (`qwen2.5:3b`)  

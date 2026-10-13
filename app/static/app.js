@@ -20,9 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorTitle = document.getElementById("error-title");
   const errorMessage = document.getElementById("error-message");
 
+  const emptyStateCard = document.getElementById("empty-state-card");
   const answerCard = document.getElementById("answer-card");
   const answerText = document.getElementById("answer-text");
   const verificationBadge = document.getElementById("verification-badge");
+  const refusalBanner = document.getElementById("refusal-banner");
+  const refusalBannerText = document.getElementById("refusal-banner-text");
   const unresolvedBox = document.getElementById("unresolved-box");
   const unresolvedList = document.getElementById("unresolved-list");
 
@@ -90,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Reset error & results
     hideError();
     hideResults();
+    if (emptyStateCard) emptyStateCard.classList.add("hidden");
     startWorkingTimer();
 
     runBtn.disabled = true;
@@ -246,6 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showError(title, msg) {
+    if (emptyStateCard) emptyStateCard.classList.add("hidden");
     errorTitle.textContent = title;
     errorMessage.textContent = msg;
     errorCard.classList.remove("hidden");
@@ -260,6 +265,8 @@ document.addEventListener("DOMContentLoaded", () => {
     traceCard.classList.add("hidden");
     evidencePanel.classList.add("hidden");
     actionsPanel.classList.add("hidden");
+    if (refusalBanner) refusalBanner.classList.add("hidden");
+    answerCard.classList.remove("card-refusal");
   }
 
   function handleErrorResponse(status, errorData) {
@@ -274,7 +281,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Render agent response safely
   function renderAgentResponse(data) {
-    // 1. Answer Card
+    if (emptyStateCard) emptyStateCard.classList.add("hidden");
+
+    // 1. Answer Card & Grounded Refusal
     answerText.textContent = data.answer || "No response generated.";
     answerCard.classList.remove("hidden");
 
@@ -282,8 +291,28 @@ document.addEventListener("DOMContentLoaded", () => {
     verificationBadge.textContent = isVerified ? "Verified" : "Needs Review";
     verificationBadge.className = `badge ${isVerified ? "badge-verified" : "badge-review"}`;
 
-    // Unresolved list
+    // Refusal handling
     const unresolved = (data.verification && data.verification.unresolved) || [];
+    const answerLower = (data.answer || "").toLowerCase();
+    const isRefusal =
+      unresolved.some((u) => u.toLowerCase().includes("no evidence found")) ||
+      answerLower.includes("could not find") ||
+      answerLower.includes("no evidence found") ||
+      answerLower.includes("not found in company records") ||
+      answerLower.includes("cannot find");
+
+    if (refusalBanner && refusalBannerText) {
+      if (isRefusal) {
+        refusalBannerText.textContent = "Grounded Refusal: Information not present in verified database records.";
+        refusalBanner.classList.remove("hidden");
+        answerCard.classList.add("card-refusal");
+      } else {
+        refusalBanner.classList.add("hidden");
+        answerCard.classList.remove("card-refusal");
+      }
+    }
+
+    // Unresolved list
     while (unresolvedList.firstChild) {
       unresolvedList.removeChild(unresolvedList.firstChild);
     }

@@ -13,7 +13,7 @@
     <header class="app-header">
       <div class="header-brand">
         <div class="brand-logo" aria-hidden="true">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
             <path d="M2 17l10 5 10-5"></path>
             <path d="M2 12l10 5 10-5"></path>
@@ -76,13 +76,15 @@
         <!-- Loading / Progress State -->
         <section id="working-card" class="card working-card hidden" aria-live="polite">
           <div class="working-content">
-            <div class="spinner" aria-hidden="true"></div>
+            <div class="spinner-container" aria-hidden="true">
+              <div class="spinner"></div>
+            </div>
             <div class="working-details">
               <h3 class="working-title">Agent Working...</h3>
               <p class="working-desc">Planning steps and querying verified internal & external sources.</p>
             </div>
             <div class="working-timer">
-              <span class="timer-label">Elapsed:</span>
+              <span class="timer-label">Elapsed</span>
               <span id="elapsed-counter" class="timer-value">0.0s</span>
             </div>
           </div>
@@ -105,11 +107,35 @@
 
         <!-- Live Results Region -->
         <div id="results-region" role="region" aria-label="Agent Results">
+          <!-- Polished Initial Empty State -->
+          <section id="empty-state-card" class="card empty-state-card">
+            <div class="empty-state-icon" aria-hidden="true">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+            </div>
+            <div class="empty-state-body">
+              <h3 class="empty-state-title">Ready for Operations</h3>
+              <p class="empty-state-desc">Enter an objective above or click a suggestion chip to begin. The agent validates query plans through strict Pydantic schemas, queries parameterized SQLite storage, and verifies all facts deterministically.</p>
+              <div class="empty-state-tags" aria-label="System guarantees">
+                <span class="feature-tag">Parameterized SQLite</span>
+                <span class="feature-tag">Deterministic Verifier</span>
+                <span class="feature-tag">Taint Isolation</span>
+              </div>
+            </div>
+          </section>
+
           <!-- Answer Card -->
           <section id="answer-card" class="card answer-card hidden">
             <div class="card-header">
-              <h2 class="card-title">Grounded Answer</h2>
+              <h2 id="answer-card-title" class="card-title">Grounded Answer</h2>
               <div id="verification-badge" class="badge"></div>
+            </div>
+            <div id="refusal-banner" class="refusal-banner hidden">
+              <span class="refusal-banner-icon" aria-hidden="true">ℹ</span>
+              <span id="refusal-banner-text" class="refusal-banner-text">Grounded Refusal: Queried information is not present in verified database records.</span>
             </div>
             <div id="answer-text" class="answer-text"></div>
             <div id="unresolved-box" class="unresolved-box hidden">
