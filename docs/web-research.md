@@ -1,8 +1,8 @@
-# Phase 4: Tavily Web Research & Untrusted Data Security Architecture
+# Web Research & Untrusted Data Security Architecture
 
 ## 1. Overview & Architectural Role
 
-Phase 4 adds external web research capability to the RAGless Knowledge Assistant via the `web_research` tool. This allows the system to ground answers in external benchmarks, industry standards, and public documentation (e.g., statutory leave policies, technology release notes) while strictly preserving internal knowledge boundaries, user privacy, and persistent memory integrity.
+The **RAGless Assistant** includes external web research capability via the `web_research` tool. This allows the system to ground answers in external benchmarks, industry standards, and public documentation (e.g., statutory leave policies, technology release notes) while strictly preserving internal knowledge boundaries, user privacy, and persistent memory integrity.
 
 External web data is inherently untrusted. The integration implements defense-in-depth at the Python layer (validator, executor, and verifier) alongside the LLM planner.
 

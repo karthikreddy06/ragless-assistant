@@ -725,7 +725,55 @@ class TestFastPathFalsePositives(unittest.TestCase):
         self.assertIsNone(res.get("retrieved_data"), "Query engine must not retrieve standard sick leave for contractors")
 
 
+class TestPlanStepValidationAndTaskAnswer(unittest.TestCase):
+    """Step 1 Polish: PlanStep extra='forbid' validation and empty task list formatting."""
+
+    def test_plan_step_extra_action_rejected(self):
+        from pydantic import ValidationError
+        from app.agent.schemas import PlanStep
+
+        # Step shape with disallowed 'action' field must be rejected
+        with self.assertRaises(ValidationError) as ctx:
+            PlanStep.model_validate({
+                "tool": "tasks",
+                "action": "list_tasks",
+                "args": {"operation": "list_tasks"},
+            })
+        self.assertIn("extra_forbidden", str(ctx.exception))
+
+    def test_plan_step_operation_in_args_rejected(self):
+        from pydantic import ValidationError
+        from app.agent.schemas import PlanStep
+
+        # Step missing top-level 'operation' must be rejected
+        with self.assertRaises(ValidationError):
+            PlanStep.model_validate({
+                "tool": "tasks",
+                "args": {"operation": "list_tasks"},
+            })
+
+    def test_empty_tasks_answer_formatting(self):
+        orchestrator = AgentOrchestrator()
+        evidence = [{"operation": "list_tasks", "tasks": [], "count": 0}]
+
+        # 1. Template answer formatting
+        ans_template = orchestrator._format_single_fact_template_answer(
+            question="What tasks do I have?",
+            evidence=evidence,
+            company_name="TechNova",
+        )
+        self.assertEqual(ans_template, "You have no tasks.")
+
+        # 2. Deterministic answer fallback
+        ans_det = orchestrator._format_deterministic_answer(
+            evidence=evidence,
+            company_name="TechNova",
+        )
+        self.assertEqual(ans_det, "You have no tasks.")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

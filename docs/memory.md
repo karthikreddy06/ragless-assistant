@@ -1,8 +1,8 @@
-# Phase 3: Persistent Memory & State Continuity
+# Persistent Memory & State Continuity
 
 ## 1. Overview
 
-In Phase 3, the **RAGless Assistant** adds **Persistent Memory** to maintain structured, user-specific state across requests and sessions without external vector databases or non-deterministic context stuffing.
+The **RAGless Assistant** includes **Persistent Memory** to maintain structured, user-specific state across requests and sessions without external vector databases or non-deterministic context stuffing.
 
 This enables persistent multi-day operational workflows such as:
 - **Day 1**: *"Help me complete onboarding"* → Retrieves department-specific onboarding checklist and initial progress (7 items remaining).
@@ -214,8 +214,8 @@ Tested across 3 repetitions against local Ollama (`qwen2.5:3b`) on identical mul
 
 ---
 
-## 8. Limitations & Scope for Phase 4
+## 8. Limitations & Scope
 
-1. **Authentication & Identity**: `user_id` is currently an unauthenticated request attribute; upstream authentication is deferred to production deployment.
-2. **Action Tools**: The agent currently performs queries and state updates. Action execution (e.g. creating tickets, dispatching Slack alerts, external web search via Tavily) is deferred to future phases.
+1. **Authentication & Identity**: `user_id` is currently an unauthenticated demonstration request attribute; upstream authentication is deferred to production deployment.
+2. **Action Tools**: The agent currently performs queries and state updates. Action execution (e.g. creating tickets, dispatching Slack alerts) is deferred to future work.
 3. **Dialogue Context**: Memory stores structured operational state (`user_profile`, `user_completed_items`), not raw chat conversation transcripts.

@@ -10,14 +10,14 @@ RAGless is an auditable operations agent that answers questions and executes mul
 
 | Component | Status | Evidence |
 | :--- | :--- | :--- |
-| **Agent Loop** | Verified locally | [`tests/test_agent.py`](tests/test_agent.py) (36 tests), [`docs/results/verification_proofs_step_a.json`](docs/results/verification_proofs_step_a.json) |
+| **Agent Loop** | Verified locally | [`tests/test_agent.py`](tests/test_agent.py) (39 tests), [`docs/agent.md`](docs/agent.md), [`docs/results/verification_proofs_step_a.json`](docs/results/verification_proofs_step_a.json) |
 | **Company Knowledge** | Verified locally | [`tests/test_backend.py`](tests/test_backend.py) (52 tests), [`data/sample_knowledge.json`](data/sample_knowledge.json) |
-| **Memory** | Verified locally | [`tests/test_memory.py`](tests/test_memory.py) (34 tests), [`docs/PHASE3_MEMORY.md`](docs/PHASE3_MEMORY.md) |
+| **Memory** | Verified locally | [`tests/test_memory.py`](tests/test_memory.py) (34 tests), [`docs/memory.md`](docs/memory.md) |
 | **Tasks** | Verified locally | [`tests/test_tasks.py`](tests/test_tasks.py) (20 tests), [`docs/TASKS.md`](docs/TASKS.md) |
-| **Web Research (Tavily client)** | Implemented, tested with mocks only | [`tests/test_web_research.py`](tests/test_web_research.py) (35 tests), [`docs/PHASE4_TAVILY.md`](docs/PHASE4_TAVILY.md) |
-| **Cloud LLM Provider (Nebius/OpenAI client)** | Implemented, tested with mocks only | [`tests/test_nebius.py`](tests/test_nebius.py) (20 tests), [`docs/PHASE2_NEBIUS.md`](docs/PHASE2_NEBIUS.md) |
+| **Web Research (Tavily client)** | Implemented, tested with mocks only | [`tests/test_web_research.py`](tests/test_web_research.py) (35 tests), [`docs/web-research.md`](docs/web-research.md) |
+| **Cloud LLM Provider (Nebius/OpenAI client)** | Implemented, tested with mocks only | [`tests/test_nebius.py`](tests/test_nebius.py) (20 tests), [`docs/cloud-provider.md`](docs/cloud-provider.md) |
 | **Web UI** | Verified locally | [`tests/test_ui.py`](tests/test_ui.py) (6 tests), [`app/static/`](app/static/) |
-| **Cloud Benchmark** | Not implemented | N/A (no live cloud API keys; mocked test harness in [`scripts/benchmark_providers.py`](scripts/benchmark_providers.py)) |
+| **Cloud Benchmark** | Script exists; never run against a live provider | [`scripts/benchmark_providers.py`](scripts/benchmark_providers.py) |
 
 ---
 
@@ -118,7 +118,8 @@ flowchart TD
 ### Known Security & Model Limitations
 - **Demo User Identifier**: The current `user_id` parameter is a demonstration identifier passed in the request header or payload; real authentication (e.g., OAuth2, JWT) and role-based access control are not implemented.
 - **Pre-Filter Scope**: The regex pre-filter (`EXTENDED_FORBIDDEN_PATTERNS`) is a defensive convenience for common jailbreak patterns, not the primary security boundary. Primary security is enforced by Pydantic schema validation, parameterized SQL, and executor intent rules.
-- **3B Planner Capabilities**: Local 3B parameter models (`qwen2.5:3b`) occasionally omit entity qualifiers on complex compound questions when fast-path routing is disabled.
+- **Contractor & Worker Sub-Group Keyword Guard**: Corporate databases store standard company-wide policies. Explicit keyword guards prevent queries mentioning worker qualifiers (`contractor`, `contractors`, `intern`, `interns`, `part-time`, `temporary`, `probation`) from false-positive matching against general company policies, ensuring they route through the LLM planner or receive grounded refusals rather than returning misleading template facts.
+- **3B Planner Limits**: Small local models (`qwen2.5:3b`) have inherent reasoning capacity limits. When deterministic fast-path routing is disabled, the model occasionally drops entity qualifiers on compound multi-department questions or produces incomplete step parameters without prompt-anchored retries.
 
 ---
 
@@ -246,7 +247,7 @@ python -m pytest tests/test_backend.py -m "slow" -q --durations=5
 ```
 
 ### Test Coverage Counts
-- `tests/test_agent.py`: **36 passed** (agent orchestrator, validator, counting client, verifier, fast-path guards)
+- `tests/test_agent.py`: **39 passed** (agent orchestrator, validator, counting client, verifier, fast-path guards)
 - `tests/test_backend.py` (not slow): **32 passed** (schema, migrations, API routes, security filters, admin token)
 - `tests/test_backend.py` (slow): **20 passed** (multi-turn reasoning, dynamic replacements via local Ollama)
 - `tests/test_memory.py`: **34 passed** (onboarding progress, profile storage, intent rules, multi-turn state)
@@ -254,7 +255,7 @@ python -m pytest tests/test_backend.py -m "slow" -q --durations=5
 - `tests/test_web_research.py`: **35 passed** (Tavily HTTP client, cache, outbound query guards, taint tracking)
 - `tests/test_nebius.py`: **20 passed** (mocked OpenAI provider client, thinking token stripper, secret redaction)
 - `tests/test_ui.py`: **6 passed** (CSP header verification, static asset delivery, zero-innerHTML DOM checks)
-- **Total: 203 automated tests passing**
+- **Total: 206 automated tests passing**
 
 ---
 
@@ -264,7 +265,7 @@ Full execution artifacts are recorded in [`docs/results/`](docs/results/).
 
 ### 1. Latency & LLM Call Benchmarks (Real qwen2.5:3b Runs)
 
-Measurements compare the baseline agent (Phase 5b) against the optimized implementation (Phase 6):
+Measurements compare the baseline agent against the optimized implementation:
 
 | Query Phrasing | Metric | Baseline (Before) | Optimized: LLM-Only (`deterministic=false`) | Default Flags (`fast_path=true, template=true`) |
 | :--- | :--- | :--- | :--- | :--- |

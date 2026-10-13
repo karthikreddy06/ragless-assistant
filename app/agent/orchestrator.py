@@ -467,6 +467,13 @@ Answer:"""
             if tot is not None:
                 return f"There are {tot} total employees across all departments."
 
+        # 7. List tasks
+        if item.get("operation") == "list_tasks":
+            tasks_list = item.get("tasks", [])
+            if not tasks_list:
+                return "You have no tasks."
+            return f"You have {len(tasks_list)} tasks: " + ", ".join(f"#{t.get('id')} {t.get('title')} [{t.get('status')}]" for t in tasks_list[:5])
+
         return None
 
     def _format_deterministic_answer(
@@ -476,6 +483,9 @@ Answer:"""
         sources: Optional[List[Dict[str, str]]] = None,
     ) -> str:
         """Fallback deterministic answer formatting when LLM text generation is unavailable."""
+        if len(evidence) == 1 and evidence[0].get("operation") == "list_tasks" and not evidence[0].get("tasks"):
+            return "You have no tasks."
+
         facts = []
         for item in evidence:
             if item.get("url"):
@@ -498,7 +508,10 @@ Answer:"""
                 facts.append(f"Completed task #{task_obj.get('id')}: {task_obj.get('title')}")
             elif item.get("operation") == "list_tasks":
                 tasks_list = item.get("tasks", [])
-                facts.append(f"{len(tasks_list)} tasks: " + ", ".join(f"#{t.get('id')} {t.get('title')} [{t.get('status')}]" for t in tasks_list[:5]))
+                if not tasks_list:
+                    facts.append("no tasks")
+                else:
+                    facts.append(f"{len(tasks_list)} tasks: " + ", ".join(f"#{t.get('id')} {t.get('title')} [{t.get('status')}]" for t in tasks_list[:5]))
         joined = "; ".join(facts) if facts else "verified facts"
         res = f"Based on verified data: {joined}."
         if sources and not any(s["url"] in res for s in sources):

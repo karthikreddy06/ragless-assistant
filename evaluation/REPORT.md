@@ -1,7 +1,7 @@
-# RAGless Assistant — Phase 4: Evaluation & Security Report
+# RAGless Assistant — Dynamic Knowledge Ingestion & Security Report
 
 **Evaluation Date**: October 5, 2026  
-**Evaluator**: Antigravity Automated Verification Harness (`scripts/run_evaluation.py`)  
+**Evaluator**: Automated Verification Harness (`scripts/run_evaluation.py`)  
 **Backend Framework**: FastAPI + SQLite + Ollama (`qwen2.5:3b`)  
 **Evaluation Knowledge Set**: NextGen AI corporate knowledge (`data/test_company.json`)
 
@@ -9,7 +9,7 @@
 
 ## 1. Objective
 
-The objective of Phase 4 is to rigorously evaluate the **RAGless Knowledge Assistant** across seven distinct criteria:
+The objective is to evaluate the **RAGless Knowledge Assistant** across seven distinct criteria when an alternate corporate knowledge set (NextGen AI via `data/test_company.json`) is dynamically ingested:
 1. **Factual Precision**: Direct retrieval accuracy for core corporate facts.
 2. **Natural-Language Understanding (NLU)**: Robustness against varied syntactic phrasing and vocabulary.
 3. **Multi-Part Query Handling**: Capability to address composite questions across entities.

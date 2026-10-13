@@ -1,8 +1,8 @@
-# Phase 1: RAGless Agent v0.1 Architecture & Security Specification
+# Agent Architecture & Security Specification
 
 ## 1. Overview
 
-The **RAGless Agent v0.1** extends the deterministic SQLite knowledge assistant with an agentic lifecycle:
+The **RAGless Agent** extends the deterministic SQLite knowledge assistant with an agentic lifecycle:
 **Understand → Plan → Validate → Execute → Observe → Verify → Respond**.
 
 Unlike traditional vector RAG or unconstrained tool-calling agents:
