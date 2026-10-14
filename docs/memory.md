@@ -214,8 +214,53 @@ Tested across 3 repetitions against local Ollama (`qwen2.5:3b`) on identical mul
 
 ---
 
-## 8. Limitations & Scope
+## 8. Authentication & Multi-User Isolation Architecture
 
-1. **Authentication & Identity**: `user_id` is currently an unauthenticated demonstration request attribute; upstream authentication is deferred to production deployment.
-2. **Action Tools**: The agent currently performs queries and state updates. Action execution (e.g. creating tickets, dispatching Slack alerts) is deferred to future work.
-3. **Dialogue Context**: Memory stores structured operational state (`user_profile`, `user_completed_items`), not raw chat conversation transcripts.
+RAGless features an integrated authentication layer that enforces strict per-user data isolation across memory, tasks, and agent execution:
+
+### 8.1 Persistence Schemas (`app/database.py`)
+- **`users` Table**: Stores normalized user identity with Argon2id password hashes:
+  ```sql
+  CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      full_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  ```
+- **`user_sessions` Table**: Tracks active cryptographically random session tokens:
+  ```sql
+  CREATE TABLE IF NOT EXISTS user_sessions (
+      session_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
+  );
+  ```
+
+### 8.2 Authentication Endpoints
+- `POST /auth/register`: Creates new user accounts with Argon2id hashing, unique email enforcement, and initial profile record.
+- `POST /auth/login`: Authenticates credentials, issues HttpOnly `ragless_session` cookie (SameSite=Lax, Secure on HTTPS/`COOKIE_SECURE=true`), and resets failure history.
+- `GET /auth/me`: Validates session cookie or Bearer token and returns profile info.
+- `POST /auth/logout`: Revokes session from `user_sessions` and clears the cookie.
+- `GET /memory/me` & `GET /tasks/me`: Returns data strictly scoped to the authenticated user.
+- `GET /memory/{user_id}` & `GET /tasks/{user_id}`: Cross-user access returns `403 Forbidden`; unauthenticated access to registered user data returns `401 Unauthorized`.
+
+### 8.3 Rate Limiting & Protection
+- **In-Memory Rate Limiter**: Consecutive failed login attempts are tracked per normalized email and per client IP (`X-Forwarded-For` or socket IP).
+- **Lockout Policy**: After 5 consecutive failures, the key is temporarily locked out for 5 minutes (`429 Too Many Requests`).
+- **Generic Errors**: Failed credentials return a generic message (`"Invalid email or password."`) to eliminate account enumeration risks.
+
+### 8.4 Production Scope & Remaining Gaps
+While structurally secure and multi-tenant isolated, the following capabilities are not production-grade:
+1. **Email Verification**: User registration activates immediately without verifying inbox ownership.
+2. **Password Reset / Recovery**: No self-service forgot-password email tokens or recovery flows.
+3. **Session Store Clustering**: The session table resides in local SQLite; a distributed Redis/cache layer is required for multi-replica horizontal scaling.
+4. **Rate Limiting Durability**: In-memory rate limiting state resets upon process restart.
+5. **SSO / MFA**: Enterprise SAML, OIDC, and multi-factor authentication are deferred to enterprise identity provider integration.
+6. **Action Tools**: The agent performs queries and state updates; external side-effects (e.g. ticketing, Slack alerts) are deferred to future integrations.
+7. **Dialogue Context**: Memory stores structured operational state (`user_profile`, `user_completed_items`), not raw chat conversation transcripts.

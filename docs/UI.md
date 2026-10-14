@@ -78,7 +78,7 @@ Every text and interactive element was mathematically evaluated for WCAG AA conf
 - Spans 100% of viewport width with 24px side padding (16px on mobile).
 - Flat square logo mark displaying the letter **"R"** on pastel pink `#F4C6D8` with `#C76B98` border.
 - "RAGless" in 600 weight with muted "Operations Agent" subtitle.
-- Right: Status pill in pale blue `#D9F1FA` (dot + active model, e.g. `ollama · qwen2.5:3b`) and User ID input (`demo-user`).
+- Right: Authenticated user profile badge (`#user-display-name`, `#user-display-email`, and `#logout-btn`) alongside the status pill in pale blue `#D9F1FA` (dot + active model, e.g. `ollama · qwen2.5:3b`).
 - **Fail-Safe Timeout**: Displays "Loading..." initially; switches to "Unavailable" with an amber dot if `/health` fails or exceeds 4 seconds.
 
 ### 4.2 Main Area (~70% Workspace / ~30% Sidebar Grid)
@@ -116,6 +116,23 @@ Every text and interactive element was mathematically evaluated for WCAG AA conf
 ### 4.3 Page Footer
 - Spans full width at viewport bottom using `margin-top: auto`.
 - Summary of architecture guarantees: *"Deterministic multi-step execution · Parameterized SQLite · Taint isolation"*.
+
+### 4.4 Authentication Experience (`#auth-view`)
+- **Split-Screen Design**:
+  - **Left Branding Panel**: Soft Pink and Sky Blue Watercolor Marble gradient background, product title, value pillars, and SVG network visualization.
+  - **Right Form Panel**: Clean white card hosting the Login and Registration forms.
+- **Client-Side Lifecycle**:
+  - `checkSession()` fires on `DOMContentLoaded`. If active session exists, transitions seamlessly to dashboard view; otherwise renders the login card.
+  - Registration form validates passwords match and are at least 8 characters. Upon 201 creation, automatically logs the user in and transitions to dashboard.
+  - Logout clears session on the server and resets the view to login.
+  - Session expiration: Any `401 Unauthorized` encountered during dashboard queries immediately transitions to the login screen with an explanatory session expiration alert.
+- **Rate Limiting & Generic Errors**:
+  - Enforces in-memory rate limiting (max 5 consecutive failures per email and IP before 5-minute lockout with HTTP 429).
+  - Failed credentials display a generic notice (`"Invalid email or password."`) to prevent account enumeration.
+- **Production Limitations**:
+  - No email verification flow (accounts active upon submission).
+  - No self-service password reset or forgotten-password recovery.
+  - No social OAuth / enterprise SSO integration.
 
 ---
 

@@ -11,6 +11,7 @@ from app.database import initialize_database, seed_database
 from app.main import app
 from app.agent.tasks import get_task_store
 from app.agent.memory import get_memory_store
+from app.auth import login_rate_limiter
 
 
 class TestUserAuthenticationAndIsolation(unittest.TestCase):
@@ -24,6 +25,8 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         self.db_path = Path(self.temp_dir.name) / "test_auth_isolation.db"
         self.env_patcher = patch.dict(os.environ, {"DATABASE_PATH": str(self.db_path)})
         self.env_patcher.start()
+
+        login_rate_limiter.reset()
 
         initialize_database()
         seed_database()
@@ -312,6 +315,118 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         r_err = self._login_user("noleak@example.com", "WrongPassword")
         self.assertNotIn("password_hash", r_err.text)
         self.assertNotIn("argon2", r_err.text)
+
+    # 16. Login rate limiting per email (5 failures then 429 lockout)
+    def test_16_login_rate_limiting_per_email(self):
+        self._register_user("Target User", "target@example.com", "CorrectPassword123!")
+
+        # 5 consecutive failures
+        for i in range(5):
+            resp = self._login_user("target@example.com", f"WrongPass{i}!")
+            self.assertEqual(resp.status_code, 401)
+            self.assertEqual(resp.json().get("detail"), "Invalid email or password.")
+
+        # 6th attempt is locked out (429)
+        resp_locked = self._login_user("target@example.com", "CorrectPassword123!")
+        self.assertEqual(resp_locked.status_code, 429)
+        self.assertEqual(resp_locked.json().get("detail"), "Too many failed login attempts. Please try again later.")
+
+    # 17. Login rate limiting per IP (5 failures then 429 lockout across different emails)
+    def test_17_login_rate_limiting_per_ip(self):
+        client_ip_headers = {"X-Forwarded-For": "198.51.100.42"}
+
+        # 5 failed attempts with different non-existent emails from same IP
+        for i in range(5):
+            resp = self.client.post(
+                "/auth/login",
+                json={"email": f"fakeuser{i}@example.com", "password": "WrongPassword!"},
+                headers=client_ip_headers,
+            )
+            self.assertEqual(resp.status_code, 401)
+
+        # 6th attempt from the same IP is locked out
+        resp_locked = self.client.post(
+            "/auth/login",
+            json={"email": "freshuser@example.com", "password": "AnyPassword!"},
+            headers=client_ip_headers,
+        )
+        self.assertEqual(resp_locked.status_code, 429)
+        self.assertEqual(resp_locked.json().get("detail"), "Too many failed login attempts. Please try again later.")
+
+    # 18. Cookie Secure flag set on HTTPS or via COOKIE_SECURE env
+    def test_18_cookie_secure_flag(self):
+        self._register_user("Secure Cookie User", "securecookie@example.com", "Password123!")
+
+        # Default HTTP: secure flag is False
+        with patch.dict(os.environ, {"COOKIE_SECURE": "false"}):
+            resp_http = self.client.post(
+                "/auth/login",
+                json={"email": "securecookie@example.com", "password": "Password123!"},
+            )
+            self.assertEqual(resp_http.status_code, 200)
+            cookie_header = resp_http.headers.get("set-cookie", "")
+            self.assertNotIn("secure", cookie_header.lower())
+
+        # With COOKIE_SECURE=true
+        with patch.dict(os.environ, {"COOKIE_SECURE": "true"}):
+            resp_env = self.client.post(
+                "/auth/login",
+                json={"email": "securecookie@example.com", "password": "Password123!"},
+            )
+            self.assertEqual(resp_env.status_code, 200)
+            cookie_header = resp_env.headers.get("set-cookie", "")
+            self.assertIn("secure", cookie_header.lower())
+
+        # With HTTPS header
+        resp_https = self.client.post(
+            "/auth/login",
+            json={"email": "securecookie@example.com", "password": "Password123!"},
+            headers={"X-Forwarded-Proto": "https"},
+        )
+        self.assertEqual(resp_https.status_code, 200)
+        cookie_header = resp_https.headers.get("set-cookie", "")
+        self.assertIn("secure", cookie_header.lower())
+
+    # 19. /knowledge/import still requires ADMIN_TOKEN and is not callable by ordinary logged-in users
+    def test_19_knowledge_import_requires_admin_token_not_ordinary_session(self):
+        import io
+        import json
+
+        self._register_user("Regular User", "regular@example.com", "Password123!")
+        r_login = self._login_user("regular@example.com", "Password123!")
+        session_id = r_login.json()["session_id"]
+
+        client_auth = TestClient(app, cookies={"ragless_session": session_id})
+        fake_content = json.dumps({
+            "company": {"name": "Admin Test", "location": "City", "employees": 10},
+            "departments": [],
+            "leave_policy": []
+        }).encode()
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-admin-token-xyz"}):
+            # 1. Logged-in user without X-Admin-Token -> 401
+            resp_no_token = client_auth.post(
+                "/knowledge/import",
+                files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
+            )
+            self.assertEqual(resp_no_token.status_code, 401)
+            self.assertIn("missing or invalid x-admin-token header", resp_no_token.json().get("detail", "").lower())
+
+            # 2. Logged-in user with incorrect X-Admin-Token -> 401
+            resp_bad_token = client_auth.post(
+                "/knowledge/import",
+                headers={"X-Admin-Token": "wrong-token"},
+                files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
+            )
+            self.assertEqual(resp_bad_token.status_code, 401)
+
+            # 3. Request with valid X-Admin-Token -> 200 (succeeds regardless of user session)
+            resp_valid_token = client_auth.post(
+                "/knowledge/import",
+                headers={"X-Admin-Token": "secret-admin-token-xyz"},
+                files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
+            )
+            self.assertEqual(resp_valid_token.status_code, 200)
 
 
 if __name__ == "__main__":

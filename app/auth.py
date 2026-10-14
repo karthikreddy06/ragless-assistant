@@ -1,8 +1,10 @@
 import logging
+import os
 import re
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import sqlite3
 
 from argon2 import PasswordHasher
@@ -21,6 +23,61 @@ SESSION_COOKIE_NAME = "ragless_session"
 SESSION_DURATION_DAYS = 7
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 USER_ID_CLEAN_REGEX = re.compile(r"[^a-zA-Z0-9_\-]")
+
+
+class LoginRateLimiter:
+    """
+    In-memory rate limiter tracking failed login attempts per key (email or IP).
+    Enforces a temporary lockout after max_failures within a given window.
+    """
+    def __init__(self, max_failures: int = 5, lockout_seconds: int = 300):
+        self.max_failures = max_failures
+        self.lockout_seconds = lockout_seconds
+        self._failures: Dict[str, List[float]] = {}
+        self._lockouts: Dict[str, float] = {}
+
+    def is_locked_out(self, key: str) -> tuple[bool, int]:
+        now = time.time()
+        lockout_until = self._lockouts.get(key, 0)
+        if now < lockout_until:
+            return True, max(1, int(lockout_until - now))
+        if key in self._lockouts:
+            del self._lockouts[key]
+        return False, 0
+
+    def record_failure(self, key: str) -> bool:
+        """Records a failure timestamp. If failure threshold is reached, locks out key and returns True."""
+        now = time.time()
+        window = self.lockout_seconds
+        recent = [t for t in self._failures.get(key, []) if now - t < window]
+        recent.append(now)
+        self._failures[key] = recent
+        if len(recent) >= self.max_failures:
+            self._lockouts[key] = now + self.lockout_seconds
+            self._failures.pop(key, None)
+            return True
+        return False
+
+    def record_success(self, key: str) -> None:
+        self._failures.pop(key, None)
+        self._lockouts.pop(key, None)
+
+    def reset(self) -> None:
+        self._failures.clear()
+        self._lockouts.clear()
+
+
+login_rate_limiter = LoginRateLimiter(max_failures=5, lockout_seconds=300)
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address, checking X-Forwarded-For if available."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
 
 
 class User(BaseModel):

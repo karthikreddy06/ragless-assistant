@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
@@ -13,14 +14,23 @@ from app.auth import (
     authenticate_user,
     create_user_session,
     extract_session_token,
+    get_client_ip,
     get_current_user,
     invalidate_user_session,
+    login_rate_limiter,
     register_user,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def is_secure_cookie_required(request: Request) -> bool:
+    """Determine whether the cookie Secure flag must be set (HTTPS or COOKIE_SECURE=true)."""
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    cookie_secure_env = os.getenv("COOKIE_SECURE", "").strip().lower() in ("true", "1", "yes")
+    return is_https or cookie_secure_env
 
 
 @router.post(
@@ -48,17 +58,51 @@ async def register(req: RegisterRequest) -> Dict[str, Any]:
     summary="User Login",
     description="Authenticates user credentials and establishes a secure session via HttpOnly cookie.",
 )
-async def login(req: LoginRequest, response: Response) -> Dict[str, Any]:
-    user = authenticate_user(req.email, req.password)
-    session_id = create_user_session(user.user_id)
+async def login(req: LoginRequest, request: Request, response: Response) -> Dict[str, Any]:
+    norm_email = req.email.strip().lower()
+    client_ip = get_client_ip(request)
 
-    # Issue secure HttpOnly session cookie
+    email_key = f"email:{norm_email}"
+    ip_key = f"ip:{client_ip}"
+
+    # 1. Rate Limiting Check: per email and per IP
+    is_locked, remaining = login_rate_limiter.is_locked_out(email_key)
+    if not is_locked:
+        is_locked, remaining = login_rate_limiter.is_locked_out(ip_key)
+
+    if is_locked:
+        logger.warning(
+            "Login rejected due to rate limiting lockout for email '%s' from IP '%s' (%ds remaining)",
+            norm_email,
+            client_ip,
+            remaining,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Please try again later.",
+        )
+
+    # 2. Attempt authentication
+    try:
+        user = authenticate_user(norm_email, req.password)
+    except HTTPException as e:
+        login_rate_limiter.record_failure(email_key)
+        login_rate_limiter.record_failure(ip_key)
+        raise e
+
+    # 3. Success: clear email failure history
+    login_rate_limiter.record_success(email_key)
+
+    session_id = create_user_session(user.user_id)
+    secure_cookie = is_secure_cookie_required(request)
+
+    # 4. Issue secure HttpOnly session cookie
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_id,
         httponly=True,
         samesite="lax",
-        secure=False,  # Suitable for local HTTP development; browsers accept on localhost
+        secure=secure_cookie,
         max_age=SESSION_DURATION_DAYS * 86400,
         path="/",
     )
@@ -107,5 +151,13 @@ async def logout(request: Request, response: Response) -> Dict[str, str]:
     token = extract_session_token(request)
     if token:
         invalidate_user_session(token)
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+
+    secure_cookie = is_secure_cookie_required(request)
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        secure=secure_cookie,
+        httponly=True,
+        samesite="lax",
+    )
     return {"message": "Logged out successfully."}
