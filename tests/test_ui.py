@@ -128,6 +128,152 @@ class TestWebUIEndpoint(unittest.TestCase):
         self.assertIn('"MOCK DATA"', js)
         self.assertIn("evidenceMockBadge", js)
 
+    def test_collapsible_run_details_and_status_pill_in_ui_assets(self):
+        """UI assets must contain collapsible run details section and provider-aware status pill styling."""
+        static_dir = Path(__file__).resolve().parent.parent / "app" / "static"
+        html_path = static_dir / "index.html"
+        css_path = static_dir / "styles.css"
+        js_path = static_dir / "app.js"
+
+        with open(html_path, "r", encoding="utf-8") as f:
+            html = f.read()
+        # Run details collapsible container
+        self.assertIn('details id="trace-card"', html)
+        self.assertIn("Run details &amp; technical diagnostics", html)
+        self.assertIn('id="results-footer-stats"', html)
+        self.assertIn('id="trace-steps"', html)
+        self.assertIn('id="verification-checks"', html)
+
+        with open(css_path, "r", encoding="utf-8") as f:
+            css = f.read()
+        self.assertIn(".status-pill", css)
+        self.assertIn(".status-ready", css)
+        self.assertIn(".status-degraded", css)
+        self.assertIn(".status-unavailable", css)
+
+        with open(js_path, "r", encoding="utf-8") as f:
+            js = f.read()
+        # Provider-aware health handling in JS
+        self.assertIn("data.llm_provider", js)
+        self.assertIn("status-ready", js)
+        self.assertIn("status-degraded", js)
+        self.assertIn("status-unavailable", js)
+
+    def test_safe_markdown_rendering_assets(self):
+        """UI assets must contain the safe DOM Markdown renderer without innerHTML/outerHTML."""
+        static_dir = Path(__file__).resolve().parent.parent / "app" / "static"
+        js_path = static_dir / "app.js"
+        css_path = static_dir / "styles.css"
+
+        with open(js_path, "r", encoding="utf-8") as f:
+            js = f.read()
+
+        self.assertIn("function renderSafeMarkdown", js)
+        self.assertIn("function renderInlineMarkdown", js)
+        self.assertIn("renderSafeMarkdown(answerText,", js)
+        self.assertIn("document.createElement", js)
+        self.assertIn("document.createTextNode", js)
+
+        # Confirm zero innerHTML assignments
+        self.assertEqual(len(re.findall(r"\.innerHTML\s*=", js)), 0)
+        self.assertEqual(len(re.findall(r"\.outerHTML\s*=", js)), 0)
+
+        with open(css_path, "r", encoding="utf-8") as f:
+            css = f.read()
+
+        self.assertIn(".answer-heading", css)
+        self.assertIn(".answer-h3", css)
+        self.assertIn(".answer-h4", css)
+        self.assertIn(".answer-list", css)
+        self.assertIn(".answer-ul", css)
+        self.assertIn(".answer-ol", css)
+        self.assertIn(".answer-paragraph", css)
+
+    def test_safe_markdown_rendering_behavior_and_xss_immunity(self):
+        """Execute node test to verify headings, lists, bold text, and malicious script/HTML immunity."""
+        import subprocess
+        import shutil
+
+        if not shutil.which("node"):
+            self.skipTest("node.js not installed on system")
+
+        script = """
+const fs = require('fs');
+const path = require('path');
+const code = fs.readFileSync(path.join(__dirname, '..', 'app', 'static', 'app.js'), 'utf8');
+
+class MockNode {
+  constructor(name) {
+    this.nodeName = name;
+    this.children = [];
+    this.textContent = '';
+    this.className = '';
+  }
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+  removeChild(child) {
+    const idx = this.children.indexOf(child);
+    if (idx !== -1) this.children.splice(idx, 1);
+  }
+  get firstChild() { return this.children[0] || null; }
+}
+
+const document = {
+  createElement: (tag) => new MockNode(tag.toUpperCase()),
+  createTextNode: (text) => {
+    const n = new MockNode('#text');
+    n.textContent = text;
+    return n;
+  }
+};
+const window = {};
+
+const fnMatch = code.match(/function renderInlineMarkdown[\\s\\S]*?window\\.renderSafeMarkdown = renderSafeMarkdown;/);
+if (!fnMatch) {
+  console.error("renderSafeMarkdown not found in app.js");
+  process.exit(1);
+}
+eval(fnMatch[0]);
+
+const container = new MockNode('DIV');
+
+// 1. Test headings, ordered list, unordered list, bold text
+const md = '### Day 1:\\n1. **Complete Security Training**\\n- Complete mandatory cybersecurity modules.\\n\\nRegular paragraph with **bold** and `code`.';
+renderSafeMarkdown(container, md);
+
+const names = container.children.map(c => c.nodeName);
+if (!names.includes('H4')) throw new Error('Missing H4 heading');
+if (!names.includes('OL')) throw new Error('Missing OL list');
+if (!names.includes('UL')) throw new Error('Missing UL list');
+if (!names.includes('P')) throw new Error('Missing P paragraph');
+
+// 2. Test malicious XSS payloads (script tags, img onerror)
+const xssContainer = new MockNode('DIV');
+const malicious = '<script>alert(1)<' + '/script><img src=x onerror=alert(2)> and **bold payload**';
+renderSafeMarkdown(xssContainer, malicious);
+
+// Ensure no SCRIPT or IMG elements were created
+function hasElement(node, tag) {
+  if (node.nodeName === tag) return true;
+  return node.children.some(c => hasElement(c, tag));
+}
+
+if (hasElement(xssContainer, 'SCRIPT')) throw new Error('XSS test failed: SCRIPT element created');
+if (hasElement(xssContainer, 'IMG')) throw new Error('XSS test failed: IMG element created');
+
+console.log("OK");
+"""
+        proc = subprocess.run(
+            ["node", "-e", script],
+            cwd=str(Path(__file__).resolve().parent),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, f"Node test failed: {proc.stderr}\n{proc.stdout}")
+        self.assertIn("OK", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

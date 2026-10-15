@@ -423,28 +423,41 @@
               </div>
             </section>
 
-            <!-- Agent Activity Stepper -->
-            <section id="trace-card" class="card trace-card hidden">
-              <div class="card-header">
+            <!-- Collapsible Run Details & Technical Diagnostics -->
+            <details id="trace-card" class="card collapsible-card hidden">
+              <summary class="panel-summary">
                 <div class="card-title-group">
                   <svg class="header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                   </svg>
-                  <h2 class="card-title">Agent activity</h2>
+                  <span class="summary-title">Run details &amp; technical diagnostics</span>
                 </div>
-                <span id="trace-step-count" class="badge badge-neutral"></span>
-              </div>
+                <div class="summary-meta">
+                  <span id="trace-step-count" class="badge badge-neutral"></span>
+                </div>
+              </summary>
 
-              <div class="activity-section">
-                <div class="section-label">Execution steps</div>
-                <div id="trace-steps" class="stepper-list"></div>
-              </div>
+              <div class="panel-body">
+                <!-- Technical Execution Statistics -->
+                <div id="results-footer-stats" class="results-stats-row" style="border-top: none; padding-top: 0; margin-bottom: 14px;">
+                  <span class="stat-cell"><span class="stat-name">Duration</span> <span id="stat-latency" class="stat-val">-</span></span>
+                  <span class="stat-cell"><span class="stat-name">LLM calls</span> <span id="stat-llm-calls" class="stat-val">-</span></span>
+                  <span class="stat-cell"><span class="stat-name">Answer mode</span> <span id="stat-answer-mode" class="stat-val">-</span></span>
+                  <span class="stat-cell"><span class="stat-name">Web calls</span> <span id="stat-web-calls" class="stat-val">-</span></span>
+                  <span class="stat-cell"><span class="stat-name">Model</span> <span id="stat-model" class="stat-val">-</span></span>
+                </div>
 
-              <div class="activity-section">
-                <div class="section-label">Verification checks</div>
-                <div id="verification-checks" class="checks-list"></div>
+                <div class="activity-section">
+                  <div class="section-label">Execution steps</div>
+                  <div id="trace-steps" class="stepper-list"></div>
+                </div>
+
+                <div class="activity-section">
+                  <div class="section-label">Verification checks</div>
+                  <div id="verification-checks" class="checks-list"></div>
+                </div>
               </div>
-            </section>
+            </details>
 
             <!-- Evidence Panel (Collapsed) -->
             <details id="evidence-panel" class="card collapsible-card hidden">
@@ -497,15 +510,6 @@
                 </div>
               </div>
             </section>
-
-            <!-- Results Stats Footer Row -->
-            <div id="results-footer-stats" class="results-stats-row hidden">
-              <span class="stat-cell"><span class="stat-name">Duration</span> <span id="stat-latency" class="stat-val">-</span></span>
-              <span class="stat-cell"><span class="stat-name">LLM calls</span> <span id="stat-llm-calls" class="stat-val">-</span></span>
-              <span class="stat-cell"><span class="stat-name">Answer mode</span> <span id="stat-answer-mode" class="stat-val">-</span></span>
-              <span class="stat-cell"><span class="stat-name">Web calls</span> <span id="stat-web-calls" class="stat-val">-</span></span>
-              <span class="stat-cell"><span class="stat-name">Model</span> <span id="stat-model" class="stat-val">-</span></span>
-            </div>
           </div>
         </div>
 

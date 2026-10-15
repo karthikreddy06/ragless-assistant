@@ -250,6 +250,7 @@ python -m pytest tests/test_backend.py -m "slow" -q --durations=5
 ```
 
 ### Test Coverage Counts
+- `tests/test_auth.py`: **22 passed** (registration, login, logout, session expiration, rate limiting, user isolation, boundaries)
 - `tests/test_agent.py`: **39 passed** (agent orchestrator, validator, counting client, verifier, fast-path guards)
 - `tests/test_backend.py` (not slow): **32 passed** (schema, migrations, API routes, security filters, admin token)
 - `tests/test_backend.py` (slow): **20 passed** (multi-turn reasoning, dynamic replacements via local Ollama)
@@ -258,7 +259,7 @@ python -m pytest tests/test_backend.py -m "slow" -q --durations=5
 - `tests/test_web_research.py`: **35 passed** (Tavily HTTP client, cache, outbound query guards, taint tracking)
 - `tests/test_nebius.py`: **20 passed** (mocked OpenAI provider client, thinking token stripper, secret redaction)
 - `tests/test_ui.py`: **6 passed** (CSP header verification, static asset delivery, zero-innerHTML DOM checks)
-- **Total: 206 automated tests passing**
+- **Total: 228 automated unit/integration tests passing (10 live cloud/web tests safely skipped when credentials unset)**
 
 ---
 
@@ -297,8 +298,9 @@ Recorded from live runs in [`docs/results/verification_proofs_step_a.json`](docs
 
 1. **Cloud Provider & External Search Verification**: `NebiusClient` and `TavilySearchClient` are fully implemented and verified with mock test suites; live integration testing against cloud endpoints requires active API keys.
 2. **Local 3B Parameter Reasoning**: Small local models (`qwen2.5:3b`) occasionally struggle with multi-hop entity extraction on questions combining three or more unrelated database concepts without fast-path assistance.
-3. **Production Authentication**: The current session `user_id` model provides demonstration user separation; enterprise deployments require integration with an identity provider (OAuth2, OIDC).
-4. **Deployment Hardening**: In high-concurrency production environments, replace SQLite with PostgreSQL and deploy behind an enterprise reverse proxy.
+3. **Authentication Gaps**: User registration lacks email verification; password reset recovery flows are not implemented; session storage is backed by local SQLite without distributed caching; rate limiting is in-memory and resets on server restart.
+4. **Proxy Hardening**: When running behind a reverse proxy (Nginx, Cloudflare, ALB), configure the proxy to strip untrusted incoming `X-Forwarded-*` headers before setting verified client values.
+5. **Deployment Hardening**: In high-concurrency production environments, replace SQLite with PostgreSQL and deploy behind an enterprise reverse proxy.
 
 ---
 
@@ -310,12 +312,18 @@ The FastAPI server exposes the following endpoints:
 | :--- | :--- | :--- |
 | `GET` | `/` | API status, project metadata, and documentation links |
 | `GET` | `/health` | Health check for SQLite database and active LLM provider |
+| `POST` | `/auth/register` | Register new user account with Argon2id hashing |
+| `POST` | `/auth/login` | Authenticate credentials and establish HttpOnly session cookie |
+| `GET` | `/auth/me` | Retrieve profile and onboarding status of current authenticated user |
+| `POST` | `/auth/logout` | Revoke current user session and clear cookie |
 | `POST` | `/agent/ask` | Primary agent endpoint (understand, plan, validate, execute, verify, respond) |
 | `POST` | `/ask` | Legacy direct query-engine endpoint (retained for backward compatibility) |
+| `GET` | `/memory/me` | Retrieve profile and onboarding progress for authenticated user |
+| `GET` | `/memory/{user_id}` | Retrieve profile for user (requires auth; users can only view their own) |
+| `GET` | `/tasks/me` | Retrieve persistent task list for authenticated user |
+| `GET` | `/tasks/{user_id}` | Retrieve tasks for user (requires auth; users can only view their own) |
 | `GET` | `/knowledge` | View current structured knowledge stored in SQLite |
-| `POST` | `/knowledge/import` | Upload JSON knowledge file (supports optional `X-Admin-Token` authentication) |
-| `GET` | `/memory/{user_id}` | Retrieve profile state and calculated onboarding progress for a user |
-| `GET` | `/tasks/{user_id}` | Retrieve persistent task list for a user |
+| `POST` | `/knowledge/import` | Upload JSON knowledge file (requires `X-Admin-Token` authentication when configured) |
 | `GET` | `/ui` | Static web interface |
 | `GET` | `/docs` | OpenAPI / Swagger interactive documentation |
 | `GET` | `/redoc` | ReDoc alternative API documentation |

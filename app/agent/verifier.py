@@ -19,6 +19,9 @@ class Verifier:
         "cannot find",
         "not available",
         "only contains",
+        "no company-specific",
+        "please confirm",
+        "confirm all company-specific",
     ]
 
     def verify(
@@ -56,7 +59,7 @@ class Verifier:
         has_any_data = False
 
         for idx, tr in enumerate(tool_results):
-            if tr.data:
+            if tr.data is not None:
                 has_any_data = True
                 self._collect_facts(tr.data, extracted_facts)
             else:

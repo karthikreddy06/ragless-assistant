@@ -129,7 +129,7 @@ class HealthResponse(BaseModel):
 
     status: str = Field(..., description="Overall health status ('ok' or 'degraded')")
     database: str = Field(..., description="Database connectivity status")
-    ollama: Dict[str, Any] = Field(..., description="Local Ollama server connectivity and model status")
+    ollama: Optional[Dict[str, Any]] = Field(default=None, description="Local Ollama server connectivity and model status")
     llm_provider: Optional[str] = Field(default=None, description="Active LLM provider ('ollama' or 'nebius')")
     llm_model: Optional[str] = Field(default=None, description="Active LLM model ID")
     llm_healthy: Optional[bool] = Field(default=None, description="Active LLM provider reachability")

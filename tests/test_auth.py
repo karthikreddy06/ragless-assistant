@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.database import initialize_database, seed_database
+from app.database import get_connection, initialize_database, seed_database
 from app.main import app
 from app.agent.tasks import get_task_store
 from app.agent.memory import get_memory_store
-from app.auth import login_rate_limiter
+from app.auth import LoginRateLimiter, login_rate_limiter
 
 
 class TestUserAuthenticationAndIsolation(unittest.TestCase):
@@ -67,6 +67,31 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         self.assertNotIn("password_hash", str(data))
         self.assertNotIn("password", str(data.get("user", {})))
 
+        # Password confirmation mismatch is rejected (400)
+        r_mismatch = self.client.post(
+            "/auth/register",
+            json={
+                "full_name": "Mismatch User",
+                "email": "mismatch@example.com",
+                "password": "Password123!",
+                "confirm_password": "WrongConfirm123!",
+            },
+        )
+        self.assertEqual(r_mismatch.status_code, 400)
+        self.assertIn("match", r_mismatch.json().get("detail", "").lower())
+
+        # Malformed email format is rejected (422)
+        r_invalid_email = self.client.post(
+            "/auth/register",
+            json={
+                "full_name": "Invalid Email",
+                "email": "not-an-email",
+                "password": "Password123!",
+                "confirm_password": "Password123!",
+            },
+        )
+        self.assertEqual(r_invalid_email.status_code, 422)
+
     # 2. Duplicate email rejection
     def test_02_duplicate_email_rejection(self):
         r1 = self._register_user("Bob First", "bob@example.com", "Password123!")
@@ -88,6 +113,10 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         # Check session cookie is set
         self.assertIn("ragless_session", resp.cookies)
         self.assertEqual(resp.cookies["ragless_session"], data["session_id"])
+        # Check cookie security attributes
+        cookie_header = resp.headers.get("set-cookie", "").lower()
+        self.assertIn("httponly", cookie_header)
+        self.assertIn("samesite=lax", cookie_header)
 
     # 4. Incorrect password rejection
     def test_04_incorrect_password_rejection(self):
@@ -128,6 +157,12 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         self.assertEqual(data["full_name"], "Emma Watson")
         self.assertEqual(data["onboarding_status"], "not_started")
 
+        # Also verify Authorization Bearer header fallback
+        client_bearer = TestClient(app)
+        resp_bearer = client_bearer.get("/auth/me", headers={"Authorization": f"Bearer {session_id}"})
+        self.assertEqual(resp_bearer.status_code, 200)
+        self.assertEqual(resp_bearer.json()["user_id"], user_id)
+
     # 7. Logout invalidates session
     def test_07_logout_invalidates_session(self):
         self._register_user("Frank Sinatra", "frank@example.com", "FrankPass123!")
@@ -141,6 +176,8 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         # Logout
         logout_resp = client_auth.post("/auth/logout")
         self.assertEqual(logout_resp.status_code, 200)
+        logout_cookie = logout_resp.headers.get("set-cookie", "").lower()
+        self.assertIn("ragless_session", logout_cookie)
 
         # Request /auth/me again -> 401
         me_after = client_auth.get("/auth/me")
@@ -293,6 +330,35 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         self.assertEqual(self.client.get("/tasks/some-registered-user").status_code, 401)
         self.assertEqual(self.client.get("/memory/some-registered-user").status_code, 401)
 
+    # 14. Expired session rejected with 401
+    def test_14_expired_session_rejected(self):
+        self._register_user("Old Session User", "oldsession@example.com", "Password123!")
+        r_login = self._login_user("oldsession@example.com", "Password123!")
+        session_id = r_login.json()["session_id"]
+
+        # Artificially expire the session in the database
+        conn = get_connection()
+        try:
+            with conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE user_sessions SET expires_at = '2020-01-01 00:00:00' WHERE session_id = ?",
+                    (session_id,),
+                )
+        finally:
+            conn.close()
+
+        client_expired = TestClient(app, cookies={"ragless_session": session_id})
+        # /auth/me returns 401
+        resp_me = client_expired.get("/auth/me")
+        self.assertEqual(resp_me.status_code, 401)
+        self.assertIn("expired", resp_me.json().get("detail", "").lower())
+
+        # /memory/me returns 401
+        self.assertEqual(client_expired.get("/memory/me").status_code, 401)
+        # /tasks/me returns 401
+        self.assertEqual(client_expired.get("/tasks/me").status_code, 401)
+
     # 15. Password hashes and credentials never leak into responses
     def test_15_password_hashes_never_leak(self):
         # Registration response
@@ -330,6 +396,30 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         resp_locked = self._login_user("target@example.com", "CorrectPassword123!")
         self.assertEqual(resp_locked.status_code, 429)
         self.assertEqual(resp_locked.json().get("detail"), "Too many failed login attempts. Please try again later.")
+
+        # Successful login resets the failure counter for that email (tested with rotating IPs to isolate email tracking)
+        self._register_user("Reset User", "resetuser@example.com", "CorrectPassword123!")
+        for i in range(3):
+            self.client.post(
+                "/auth/login",
+                json={"email": "resetuser@example.com", "password": f"WrongPass{i}!"},
+                headers={"X-Forwarded-For": f"198.51.100.{100 + i}"},
+            )
+        # 1 success resets email failure counter
+        r_ok = self.client.post(
+            "/auth/login",
+            json={"email": "resetuser@example.com", "password": "CorrectPassword123!"},
+            headers={"X-Forwarded-For": "198.51.100.110"},
+        )
+        self.assertEqual(r_ok.status_code, 200)
+        # 3 more failures: should not be locked out because email counter was reset
+        for i in range(3):
+            r_retry = self.client.post(
+                "/auth/login",
+                json={"email": "resetuser@example.com", "password": f"WrongPassAgain{i}!"},
+                headers={"X-Forwarded-For": f"198.51.100.{120 + i}"},
+            )
+            self.assertEqual(r_retry.status_code, 401)
 
     # 17. Login rate limiting per IP (5 failures then 429 lockout across different emails)
     def test_17_login_rate_limiting_per_ip(self):
@@ -427,6 +517,142 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
                 files={"file": ("test.json", io.BytesIO(fake_content), "application/json")},
             )
             self.assertEqual(resp_valid_token.status_code, 200)
+
+    # 20. Two-user complete isolation end-to-end
+    def test_20_two_user_complete_isolation_e2e(self):
+        # Create User Alice
+        r_a = self._register_user("Alice Wonderland", "alice_iso@example.com", "AlicePass123!")
+        user_a_id = r_a.json()["user"]["user_id"]
+        sess_a = self._login_user("alice_iso@example.com", "AlicePass123!").json()["session_id"]
+        client_a = TestClient(app, cookies={"ragless_session": sess_a})
+
+        # Create User Bob
+        r_b = self._register_user("Bob Builder", "bob_iso@example.com", "BobPass123!")
+        user_b_id = r_b.json()["user"]["user_id"]
+        sess_b = self._login_user("bob_iso@example.com", "BobPass123!").json()["session_id"]
+        client_b = TestClient(app, cookies={"ragless_session": sess_b})
+
+        # Alice: set profile, complete onboarding item 1, create task
+        mem_store = get_memory_store()
+        task_store = get_task_store()
+
+        mem_store.set_profile(user_a_id, role="Lead Backend Engineer", department="backend")
+        mem_store.mark_item_complete(user_a_id, 1)
+        task_store.create_task(user_a_id, "Alice Confidential Roadmap")
+
+        # Bob: set profile, complete onboarding item 2, create task
+        mem_store.set_profile(user_b_id, role="AI Researcher", department="ai")
+        mem_store.mark_item_complete(user_b_id, 2)
+        task_store.create_task(user_b_id, "Bob Neural Architecture")
+
+        # 1. Cross-access to memory endpoints rejected with 403
+        resp_a_on_b = client_a.get(f"/memory/{user_b_id}")
+        self.assertEqual(resp_a_on_b.status_code, 403)
+        self.assertIn("cannot access another user's profile", resp_a_on_b.json().get("detail", "").lower())
+
+        resp_b_on_a = client_b.get(f"/memory/{user_a_id}")
+        self.assertEqual(resp_b_on_a.status_code, 403)
+        self.assertIn("cannot access another user's profile", resp_b_on_a.json().get("detail", "").lower())
+
+        # 2. Cross-access to tasks endpoints rejected with 403
+        resp_a_tasks_b = client_a.get(f"/tasks/{user_b_id}")
+        self.assertEqual(resp_a_tasks_b.status_code, 403)
+        self.assertIn("cannot access another user's tasks", resp_a_tasks_b.json().get("detail", "").lower())
+
+        resp_b_tasks_a = client_b.get(f"/tasks/{user_a_id}")
+        self.assertEqual(resp_b_tasks_a.status_code, 403)
+        self.assertIn("cannot access another user's tasks", resp_b_tasks_a.json().get("detail", "").lower())
+
+        # 3. Personal /memory/me and /tasks/me strictly isolated
+        me_a = client_a.get("/memory/me").json()
+        self.assertEqual(me_a["user_id"], user_a_id)
+        self.assertEqual(me_a["profile"]["role"], "Lead Backend Engineer")
+        completed_a = {it["id"] for it in me_a["progress"]["completed_items"]}
+        self.assertIn(1, completed_a)
+        self.assertNotIn(2, completed_a)
+
+        me_b = client_b.get("/memory/me").json()
+        self.assertEqual(me_b["user_id"], user_b_id)
+        self.assertEqual(me_b["profile"]["role"], "AI Researcher")
+        self.assertEqual(me_b["profile"]["department"], "ai")
+        completed_b = {it["id"] for it in me_b["progress"]["completed_items"]}
+        self.assertIn(2, completed_b)
+        self.assertNotIn(1, completed_b)
+
+        tasks_a = client_a.get("/tasks/me").json()
+        self.assertEqual(tasks_a["count"], 1)
+        self.assertEqual(tasks_a["tasks"][0]["title"], "Alice Confidential Roadmap")
+
+        tasks_b = client_b.get("/tasks/me").json()
+        self.assertEqual(tasks_b["count"], 1)
+        self.assertEqual(tasks_b["tasks"][0]["title"], "Bob Neural Architecture")
+
+        # 4. Agent operation spoofing: Alice passes Bob's user_id to /agent/ask
+        resp_agent = client_a.post(
+            "/agent/ask",
+            json={"question": "What are my tasks?", "user_id": user_b_id},
+        )
+        self.assertEqual(resp_agent.status_code, 200)
+        agent_data = resp_agent.json()
+        # Identity is strictly bound to Alice, NOT Bob
+        self.assertEqual(agent_data["user_id"], user_a_id)
+
+    # 21. Rate limiter thread-safety under concurrent calls
+    def test_21_rate_limiter_concurrency_thread_safety(self):
+        import concurrent.futures
+        limiter = LoginRateLimiter(max_failures=10, lockout_seconds=60)
+        test_key = "ip:203.0.113.99"
+
+        def attempt_fail():
+            return limiter.record_failure(test_key)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _: attempt_fail(), range(15)))
+
+        is_locked, remaining = limiter.is_locked_out(test_key)
+        self.assertTrue(is_locked)
+        self.assertGreater(remaining, 0)
+        # Exactly one caller should have tripped the threshold transition
+        self.assertEqual(results.count(True), 1)
+
+    # 22. Verification of all endpoints and authorization boundaries
+    def test_22_api_endpoints_authorization_boundaries(self):
+        # 1. /health: public, healthy, no secrets
+        r_health = self.client.get("/health")
+        self.assertEqual(r_health.status_code, 200)
+        self.assertIn("status", r_health.json())
+        self.assertNotIn("password", r_health.text.lower())
+        self.assertNotIn("token", r_health.text.lower())
+
+        # 2. /ask: public question endpoint
+        r_ask = self.client.post("/ask", json={"question": "What is the company name?"})
+        self.assertIn(r_ask.status_code, (200, 503))
+
+        # 3. /knowledge: public view
+        r_know = self.client.get("/knowledge")
+        self.assertEqual(r_know.status_code, 200)
+
+        # 4. /auth/me: 401 unauthenticated
+        self.assertEqual(self.client.get("/auth/me").status_code, 401)
+
+        # 5. /memory/me: 401 unauthenticated
+        self.assertEqual(self.client.get("/memory/me").status_code, 401)
+
+        # 6. /tasks/me: 401 unauthenticated
+        self.assertEqual(self.client.get("/tasks/me").status_code, 401)
+
+        # 7. /agent/ask: unauthenticated with demo-user -> allowed (200)
+        r_demo = self.client.post("/agent/ask", json={"question": "What is the company name?"})
+        self.assertEqual(r_demo.status_code, 200)
+        self.assertEqual(r_demo.json()["user_id"], "demo-user")
+
+        # 8. /agent/ask: unauthenticated attempting to impersonate real account -> 401
+        r_spoof = self.client.post(
+            "/agent/ask",
+            json={"question": "What is the company name?", "user_id": "alice_registered"},
+        )
+        self.assertEqual(r_spoof.status_code, 401)
+        self.assertIn("authentication required", r_spoof.json().get("detail", "").lower())
 
 
 if __name__ == "__main__":

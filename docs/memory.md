@@ -251,11 +251,22 @@ RAGless features an integrated authentication layer that enforces strict per-use
 - `GET /memory/{user_id}` & `GET /tasks/{user_id}`: Cross-user access returns `403 Forbidden`; unauthenticated access to registered user data returns `401 Unauthorized`.
 
 ### 8.3 Rate Limiting & Protection
-- **In-Memory Rate Limiter**: Consecutive failed login attempts are tracked per normalized email and per client IP (`X-Forwarded-For` or socket IP).
-- **Lockout Policy**: After 5 consecutive failures, the key is temporarily locked out for 5 minutes (`429 Too Many Requests`).
+- **In-Memory Rate Limiter**: Consecutive failed login attempts are tracked per normalized email and per client IP (`X-Forwarded-For` or socket IP). Uses thread-safe synchronization (`threading.Lock`) to prevent race conditions under concurrent requests.
+- **Lockout Policy**: After 5 consecutive failures within a 300s window, the key is temporarily locked out for 5 minutes (`429 Too Many Requests`).
 - **Generic Errors**: Failed credentials return a generic message (`"Invalid email or password."`) to eliminate account enumeration risks.
 
-### 8.4 Production Scope & Remaining Gaps
+### 8.4 Server-Side Identity Derivation & Spoofing Defense
+- **Strict Server Binding**: All user-specific agent operations derive identity strictly from the authenticated server-side session (`current_user.user_id`). Client-supplied `payload.user_id` or query parameters are discarded.
+- **LLM Boundary Protection**: The plan validator (`validate_plan`) explicitly forbids the LLM from injecting a `user_id` argument into any plan step. Tool execution directly receives the server-validated user identity.
+- **Cross-User Protection**: Accessing `/memory/{user_id}` or `/tasks/{user_id}` for another user's ID is rejected with `403 Forbidden`. Unauthenticated requests to user endpoints return `401 Unauthorized`.
+
+### 8.5 Security Architecture & Deployment Considerations
+1. **CSRF Protection Model**: Session cookies are configured with `SameSite=Lax`, `HttpOnly=True`, and `Path="/"`. In modern browsers, `SameSite=Lax` cookies are not transmitted on cross-site `POST`, `PUT`, or `DELETE` requests, providing robust protection against cross-origin state-changing actions.
+2. **Cookie Secure Flag**: Dynamic enforcement via `request.url.scheme == "https"`, `X-Forwarded-Proto == "https"`, or `COOKIE_SECURE=true` in environment configuration.
+3. **Proxy Header Trust**: The server extracts client IP from `X-Forwarded-For` and protocol from `X-Forwarded-Proto`. When deploying behind an enterprise reverse proxy (e.g. Nginx, AWS ALB, Cloudflare), ensure the proxy is configured to strip incoming client `X-Forwarded-*` headers and append authentic values. Direct internet exposure without a trusted proxy may allow spoofing of client IP rate-limiting keys.
+4. **Password Handling**: Password hashing employs Argon2id with default parameters from `argon2-cffi`. Timing attack mitigation is implemented via dummy hash verification on non-existent usernames.
+
+### 8.6 Production Scope & Remaining Gaps
 While structurally secure and multi-tenant isolated, the following capabilities are not production-grade:
 1. **Email Verification**: User registration activates immediately without verifying inbox ownership.
 2. **Password Reset / Recovery**: No self-service forgot-password email tokens or recovery flows.

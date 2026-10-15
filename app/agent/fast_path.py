@@ -51,20 +51,40 @@ def detect_fast_path_plan(question: str) -> Optional[AgentPlan]:
             steps=[PlanStep(tool="tasks", operation="complete_task", args={"task_id": task_id})],
         )
 
-    # (b) Create tasks from onboarding
-    if re.search(r"\b(?:create|add|set\s*up)\s+tasks?\s+(?:for|from)\s+(?:my\s+)?(?:first-week\s+)?onboarding\b|\b(?:create|add|set\s*up)\s+(?:my\s+)?(?:first-week\s+)?onboarding\s+tasks?\b", q_lower):
+    # (b) Create tasks from onboarding (explicit imperative creation only)
+    if re.search(r"\b(?:create|add|set\s*up|populate|generate)\s+(?:my\s+)?tasks?\s+(?:for|from)\s+(?:my\s+)?(?:first-week\s+)?onboarding\b|\b(?:create|add|set\s*up|populate|generate)\s+(?:my\s+)?(?:first-week\s+)?onboarding\s+tasks?\b", q_lower):
         logger.info("Fast-path triggered: create_tasks_from_onboarding for '%s'", question)
         return AgentPlan(
             goal="Create tasks from onboarding checklist items",
             steps=[PlanStep(tool="tasks", operation="create_tasks_from_onboarding", args={})],
         )
 
-    # (c) What tasks do I have
-    if re.search(r"\b(?:what\s+tasks?\s+do\s+i\s+have|show\s+(?:my\s+)?tasks?|list\s+(?:my\s+)?tasks?|view\s+(?:my\s+)?tasks?)\b", q_lower):
+    # (c) List / show tasks (strictly read-only)
+    if re.search(r"\b(?:what\s+(?:onboarding\s+)?tasks?\s+do\s+i\s+have|show\s+(?:me\s+)?(?:my\s+)?(?:onboarding\s+)?tasks?|list\s+(?:my\s+)?(?:onboarding\s+)?tasks?|view\s+(?:my\s+)?(?:onboarding\s+)?tasks?|get\s+(?:my\s+)?(?:onboarding\s+)?tasks?)\b", q_lower):
         logger.info("Fast-path triggered: list_tasks for '%s'", question)
         return AgentPlan(
             goal="List user tasks",
             steps=[PlanStep(tool="tasks", operation="list_tasks", args={})],
+        )
+
+    # (d) First-week preparation and guidance (strictly read-only retrieval)
+    first_week_prep_match = re.search(
+        r"\b(?:"
+        r"(?:prepare|plan|get\s+ready|ready|roadmap|guide|guidance|overview|help\s+me\s+prepare)\b.*?\b(?:first\s+week|first-week)\b|"
+        r"(?:what\s+(?:do\s+i\s+need|should\s+i\s+do|to\s+expect)\s+for\s+(?:my\s+)?first\s+week\b)|"
+        r"(?:everything\s+i\s+need\s+for\s+(?:my\s+)?first\s+week\b)|"
+        r"(?:first\s+week|first-week)\s+(?:preparation|guide|roadmap|plan|checklist)\b"
+        r")",
+        q_lower,
+    )
+    if first_week_prep_match and not re.search(r"\b(?:create|add|set\s*up)\s+tasks?\b", q_lower):
+        logger.info("Fast-path triggered: first-week preparation for '%s'", question)
+        return AgentPlan(
+            goal="Prepare first-week onboarding guidance and schedule",
+            steps=[
+                PlanStep(tool="company_knowledge", input="What is the onboarding checklist and schedule for new employees?"),
+                PlanStep(tool="memory", operation="get_progress", args={}),
+            ],
         )
 
     # 2. Onboarding progress queries

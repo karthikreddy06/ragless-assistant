@@ -260,6 +260,29 @@ def validate_plan(
 
             scan_for_sql(args)
 
+            if clean_tool == "tasks" and user_question:
+                op = (step.operation or "").strip().lower()
+                if op == "create_tasks_from_onboarding":
+                    from app.agent.tasks import validate_onboarding_tasks_intent
+                    if not validate_onboarding_tasks_intent(user_question):
+                        raise PlanValidationError(
+                            f"Step {idx} attempts 'create_tasks_from_onboarding' without explicit user intent in question: '{user_question}'"
+                        )
+                elif op == "create_task":
+                    from app.agent.tasks import validate_create_task_intent
+                    task_title = str(args.get("title", "")).strip()
+                    if not validate_create_task_intent(user_question, task_title):
+                        raise PlanValidationError(
+                            f"Step {idx} attempts 'create_task' without explicit user intent or verbatim title match: '{task_title}'"
+                        )
+                elif op == "complete_task":
+                    from app.agent.tasks import validate_complete_task_intent
+                    tid = args.get("task_id")
+                    if tid is not None and not validate_complete_task_intent(user_question, task_id=int(tid)):
+                        raise PlanValidationError(
+                            f"Step {idx} attempts 'complete_task' without explicit completion intent for task #{tid}"
+                        )
+
         elif clean_tool == "web_research":
             args = step.args or {}
             query = args.get("query") or step.input or ""

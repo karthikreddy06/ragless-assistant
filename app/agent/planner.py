@@ -66,12 +66,12 @@ class AgentPlanner:
             "  Parameter: 'args': {'query': '<concise search query derived from user question>', 'max_results': 3}.\n\n"
             f"{catalog_section}"
             "When to use Tasks operations:\n"
-            "- 'create_tasks_from_onboarding': User explicitly asks to create, add, or set up tasks for their onboarding or first week (args: {}).\n"
-            "- 'create_task': User explicitly asks to create or add a new task with a specific title (args: {'title': '...'}).\n"
-            "- 'list_tasks': User asks what tasks they have, or to show/list their tasks (args: {} or {'status': 'open'|'done'}).\n"
+            "- 'create_tasks_from_onboarding': ONLY when user text EXPLICITLY commands creating, adding, or setting up tasks for onboarding (e.g. 'Create tasks for my onboarding'). NEVER use for first-week preparation, guidance, or viewing tasks (args: {}).\n"
+            "- 'create_task': ONLY when user explicitly asks to create or add a new individual task with a specific title (args: {'title': '...'}).\n"
+            "- 'list_tasks': User asks what tasks they have, or to show/list/view their tasks (e.g. 'Show me my onboarding tasks', 'What tasks do I have') (args: {} or {'status': 'open'|'done'}).\n"
             "- 'complete_task': User explicitly asks to complete, finish, or mark done a task (args: {'task_id': <int>}).\n\n"
             "When to use Memory operations:\n"
-            "- 'get_progress': User asks what onboarding items are remaining, left to do, or asks for help completing onboarding.\n"
+            "- 'get_progress': User asks what onboarding items are remaining, what is left to do, asks for first-week preparation, or asks for their onboarding status.\n"
             "- 'get_profile': User asks for their own profile, role, or department.\n"
             "- 'set_profile': User explicitly specifies their role or department (args: {'role': '...', 'department': '...'}).\n"
             "- 'mark_item_complete': User explicitly states they completed or finished a checklist item (args: {'item_id': <integer ID from catalog>}).\n"
@@ -89,6 +89,15 @@ class AgentPlanner:
             '      {"tool": "web_research", "args": {"query": "UK statutory minimum annual leave entitlement", "max_results": 1}}\n'
             '    ]\n'
             "  }\n\n"
+            "  Example First-Week Preparation Question: \"Prepare everything I need for my first week\"\n"
+            "  Example Plan (strictly READ-ONLY, NO task creation):\n"
+            "  {\n"
+            '    "goal": "Prepare first-week onboarding guidance and schedule",\n'
+            '    "steps": [\n'
+            '      {"tool": "company_knowledge", "input": "What is the onboarding checklist and schedule for new employees?"},\n'
+            '      {"tool": "memory", "operation": "get_progress", "args": {}}\n'
+            '    ]\n'
+            "  }\n\n"
             "  Example Task Creation Question: \"Create tasks for my onboarding\"\n"
             "  Example Plan (notice tool is 'tasks' with 'operation'):\n"
             "  {\n"
@@ -101,7 +110,7 @@ class AgentPlanner:
             "1. ONLY use 'company_knowledge', 'memory', 'tasks', or 'web_research'. Never invent tools (e.g. 'execute_sql', 'run_shell', 'delete_task' are forbidden).\n"
             "2. NEVER write SQL queries, table names, or code in any parameter.\n"
             "3. NEVER specify 'user_id'. user_id is injected exclusively by server context and is strictly forbidden in plan steps.\n"
-            "4. READ-ONLY INTENT SAFETY: Only use write operations ('set_profile', 'mark_item_complete', 'set_onboarding_status', 'create_tasks_from_onboarding', 'create_task', 'complete_task') when the user request explicitly instructs a change. If the user asks an informational question (e.g. 'what is a task?', 'what is security training?'), use 'company_knowledge' or read-only operations and do NOT write.\n"
+            "4. READ-ONLY INTENT SAFETY: Only use write operations ('set_profile', 'mark_item_complete', 'set_onboarding_status', 'create_tasks_from_onboarding', 'create_task', 'complete_task') when the user request explicitly instructs a change. If the user asks for preparation, guidance, an overview, or an informational question (e.g. 'Prepare everything I need for my first week', 'what is a task?'), use 'company_knowledge' or read-only operations and do NOT write.\n"
             "5. PRESERVE USER INTENT & ENTITIES: Faithfully retain the user's specific requested roles, entities, and questions in each step's input.\n"
             "6. Output valid JSON ONLY matching this structure:\n"
             "{\n"

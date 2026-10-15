@@ -772,6 +772,159 @@ class TestPlanStepValidationAndTaskAnswer(unittest.TestCase):
         self.assertEqual(ans_det, "You have no tasks.")
 
 
+class TestFirstWeekAndTaskWorkflow(unittest.TestCase):
+    """Workflow validation tests for first-week assistance, task isolation, and health checks."""
+
+    def test_first_week_preparation_produces_useful_response_without_writes(self):
+        orchestrator = AgentOrchestrator()
+        res = orchestrator.run("Prepare everything I need for my first week", user_id="test-prep-user")
+
+        self.assertIsNotNone(res.plan)
+        self.assertEqual(len(res.plan.steps), 2)
+        step_tools = [s.tool for s in res.plan.steps]
+        self.assertIn("company_knowledge", step_tools)
+        self.assertIn("memory", step_tools)
+        self.assertNotIn("tasks", step_tools)
+
+        self.assertFalse(res.tasks_used)
+        self.assertIsNone(res.tasks_changed)
+        self.assertTrue(res.verification.passed)
+        self.assertIn("Day 1", res.answer)
+
+    def test_first_week_answer_is_concise_and_duplicate_free(self):
+        import re
+        from app.agent.orchestrator import _clean_first_week_answer
+        # Test clean helper truncates duplicate roadmap loop and cleans repetitive general recommendations
+        raw_duplicate_answer = (
+            "For your first week at TechNova, here is your plan:\n\n"
+            "### Day 1:\n"
+            "- Complete Security Training\n\n"
+            "### Day 3:\n"
+            "- Meet Team Lead\n\n"
+            "### General Recommendations:\n"
+            "- Complete Security Training as soon as possible.\n"
+            "- Meet Team Lead on Day 3.\n\n"
+            "### Day 1:\n"
+            "- Complete Security Training\n"
+        )
+        cleaned = _clean_first_week_answer(raw_duplicate_answer, evidence=[
+            {"type": "onboarding", "title": "Complete Security Training", "day_due": 1},
+            {"type": "onboarding", "title": "Meet Team Lead", "day_due": 3},
+            {"total_items": 7, "completed_count": 0, "remaining_count": 7},
+        ], company_name="TechNova")
+
+        # Day 1 should only appear once
+        self.assertEqual(len(re.findall(r"(?i)###\s*Day\s*1\b", cleaned)), 1)
+        # General recommendations must not repeat the exact tasks
+        self.assertNotIn("- Complete Security Training as soon as possible.", cleaned)
+        # Progress must be present
+        self.assertIn("0 of 7 items completed", cleaned)
+
+    def test_listing_tasks_does_not_create_tasks(self):
+        orchestrator = AgentOrchestrator()
+        res = orchestrator.run("Show me my onboarding tasks", user_id="test-list-user")
+
+        self.assertIsNotNone(res.plan)
+        self.assertEqual(len(res.plan.steps), 1)
+        self.assertEqual(res.plan.steps[0].tool, "tasks")
+        self.assertEqual(res.plan.steps[0].operation, "list_tasks")
+
+        self.assertIsNone(res.tasks_changed)
+        self.assertTrue(res.verification.passed)
+
+    def test_explicit_onboarding_task_creation_and_idempotency(self):
+        orchestrator = AgentOrchestrator()
+        uid = "test-idempotent-user"
+
+        res1 = orchestrator.run("Create tasks for my onboarding", user_id=uid)
+        self.assertIsNotNone(res1.tasks_changed)
+        created_count = len(res1.tasks_changed)
+        self.assertGreater(created_count, 0)
+
+        # Repeated execution must be idempotent (0 additional tasks created)
+        res2 = orchestrator.run("Create tasks for my onboarding", user_id=uid)
+        self.assertEqual(len(res2.tasks_changed or []), 0)
+
+    def test_missing_company_knowledge_gives_general_guidance(self):
+        from unittest.mock import patch
+        orchestrator = AgentOrchestrator()
+
+        with patch("app.agent.orchestrator.get_current_company_name", return_value="AcmeCorp"):
+            # Simulate no evidence returned from tools
+            with patch.object(orchestrator.executor, "execute") as mock_exec:
+                from app.agent.schemas import ToolResult
+                mock_exec.return_value = ToolResult(
+                    tool="company_knowledge",
+                    success=True,
+                    source="sqlite",
+                    data=None,
+                )
+                res = orchestrator.run("Prepare everything I need for my first week", user_id="test-no-data-user")
+                self.assertIn("No company-specific onboarding checklist records were found", res.answer)
+                self.assertIn("general guidance", res.answer.lower())
+                self.assertIn("manager or hr", res.answer.lower())
+                self.assertIsNone(res.tasks_changed)
+                self.assertTrue(res.verification.passed)
+
+    def test_health_status_provider_aware(self):
+        from unittest.mock import patch
+        from app.main import health
+
+        # 1. Ollama provider healthy
+        with patch.dict(os.environ, {"LLM_PROVIDER": "ollama"}):
+            with patch("app.agent.llm.check_active_llm_health", return_value={"provider": "ollama", "available": True, "model": "qwen2.5:3b"}):
+                h1 = health()
+                self.assertEqual(h1.status, "ok")
+                self.assertEqual(h1.llm_provider, "ollama")
+                self.assertTrue(h1.llm_healthy)
+
+        # 2. Nebius provider healthy without requiring Ollama
+        with patch.dict(os.environ, {"LLM_PROVIDER": "nebius", "NEBIUS_API_KEY": "test_key"}):
+            with patch("app.agent.llm.check_active_llm_health", return_value={"provider": "nebius", "available": True, "model": "meta-llama/Meta-Llama-3.1-8B-Instruct"}):
+                h2 = health()
+                self.assertEqual(h2.status, "ok")
+                self.assertEqual(h2.llm_provider, "nebius")
+                self.assertTrue(h2.llm_healthy)
+
+        # 3. Provider unhealthy reports degraded
+        with patch.dict(os.environ, {"LLM_PROVIDER": "ollama"}):
+            with patch("app.agent.llm.check_active_llm_health", return_value={"provider": "ollama", "available": False, "model": "qwen2.5:3b"}):
+                h3 = health()
+                self.assertEqual(h3.status, "degraded")
+                self.assertFalse(h3.llm_healthy)
+
+    def test_user_isolation_tasks_endpoint(self):
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.auth import create_user_session, register_user, RegisterRequest
+        client = TestClient(app)
+
+        user_a = register_user(RegisterRequest(
+            full_name="User Alpha",
+            email="alpha@example.com",
+            password="Password123!",
+            confirm_password="Password123!",
+        ))
+        user_b = register_user(RegisterRequest(
+            full_name="User Beta",
+            email="beta@example.com",
+            password="Password123!",
+            confirm_password="Password123!",
+        ))
+
+        token_a = create_user_session(user_a.user_id)
+        client.cookies.set("ragless_session", token_a)
+
+        # User A accessing own tasks -> 200
+        resp_own = client.get(f"/tasks/{user_a.user_id}")
+        self.assertEqual(resp_own.status_code, 200)
+
+        # User A attempting to access User B's tasks -> 403 Forbidden
+        resp_other = client.get(f"/tasks/{user_b.user_id}")
+        self.assertEqual(resp_other.status_code, 403)
+        self.assertIn("Access denied", resp_other.json().get("detail", ""))
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -36,7 +36,7 @@ def get_orchestrator() -> AgentOrchestrator:
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def ask_agent(payload: AgentRequest, request: Request) -> AgentResponse:
+def ask_agent(payload: AgentRequest, request: Request) -> AgentResponse:
     current_user = get_optional_current_user(request)
     if current_user:
         # Authenticated user: ALWAYS bind agent execution strictly to authenticated identity.

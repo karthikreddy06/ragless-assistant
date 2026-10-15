@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -29,42 +30,48 @@ class LoginRateLimiter:
     """
     In-memory rate limiter tracking failed login attempts per key (email or IP).
     Enforces a temporary lockout after max_failures within a given window.
+    Thread-safe implementation protected by an internal lock.
     """
     def __init__(self, max_failures: int = 5, lockout_seconds: int = 300):
         self.max_failures = max_failures
         self.lockout_seconds = lockout_seconds
         self._failures: Dict[str, List[float]] = {}
         self._lockouts: Dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def is_locked_out(self, key: str) -> tuple[bool, int]:
-        now = time.time()
-        lockout_until = self._lockouts.get(key, 0)
-        if now < lockout_until:
-            return True, max(1, int(lockout_until - now))
-        if key in self._lockouts:
-            del self._lockouts[key]
-        return False, 0
+        with self._lock:
+            now = time.time()
+            lockout_until = self._lockouts.get(key, 0)
+            if now < lockout_until:
+                return True, max(1, int(lockout_until - now))
+            if key in self._lockouts:
+                del self._lockouts[key]
+            return False, 0
 
     def record_failure(self, key: str) -> bool:
         """Records a failure timestamp. If failure threshold is reached, locks out key and returns True."""
-        now = time.time()
-        window = self.lockout_seconds
-        recent = [t for t in self._failures.get(key, []) if now - t < window]
-        recent.append(now)
-        self._failures[key] = recent
-        if len(recent) >= self.max_failures:
-            self._lockouts[key] = now + self.lockout_seconds
-            self._failures.pop(key, None)
-            return True
-        return False
+        with self._lock:
+            now = time.time()
+            window = self.lockout_seconds
+            recent = [t for t in self._failures.get(key, []) if now - t < window]
+            recent.append(now)
+            self._failures[key] = recent
+            if len(recent) >= self.max_failures:
+                self._lockouts[key] = now + self.lockout_seconds
+                self._failures.pop(key, None)
+                return True
+            return False
 
     def record_success(self, key: str) -> None:
-        self._failures.pop(key, None)
-        self._lockouts.pop(key, None)
+        with self._lock:
+            self._failures.pop(key, None)
+            self._lockouts.pop(key, None)
 
     def reset(self) -> None:
-        self._failures.clear()
-        self._lockouts.clear()
+        with self._lock:
+            self._failures.clear()
+            self._lockouts.clear()
 
 
 login_rate_limiter = LoginRateLimiter(max_failures=5, lockout_seconds=300)

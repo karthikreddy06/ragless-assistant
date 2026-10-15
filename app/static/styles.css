@@ -250,13 +250,20 @@ body {
   background-color: var(--status-green-text);
 }
 
-.status-loading .status-dot,
-.status-unavailable .status-dot {
+.status-degraded .status-dot,
+.status-loading .status-dot {
   background-color: var(--status-amber-text);
 }
 
+.status-unavailable .status-dot,
 .status-error .status-dot {
   background-color: var(--status-red-text);
+}
+
+.status-pill.status-degraded {
+  background-color: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
 }
 
 /* ==========================================================================
@@ -813,10 +820,100 @@ body {
 
 .answer-text {
   font-size: var(--text-base);
-  line-height: 1.7;
+  line-height: 1.65;
   color: var(--text-main);
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.answer-text .answer-heading {
+  margin-top: 18px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-main);
+}
+
+.answer-text .answer-heading:first-child {
+  margin-top: 0;
+}
+
+.answer-text .answer-h3 {
+  font-size: var(--text-lg);
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.answer-text .answer-h4 {
+  font-size: var(--text-md);
+  color: var(--accent-primary);
+  margin-top: 16px;
+  margin-bottom: 6px;
+}
+
+.answer-text .answer-h5 {
+  font-size: var(--text-base);
+  color: var(--text-main);
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.answer-text .answer-paragraph {
+  margin: 0 0 10px 0;
+  line-height: 1.65;
+  color: var(--text-main);
+}
+
+.answer-text .answer-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.answer-text .answer-list {
+  margin: 6px 0 14px 24px;
+  padding: 0;
+}
+
+.answer-text .answer-ul {
+  list-style-type: disc;
+}
+
+.answer-text .answer-ol {
+  list-style-type: decimal;
+}
+
+.answer-text .answer-list-item {
+  font-size: var(--text-base);
+  line-height: 1.55;
+  margin-bottom: 6px;
+  color: var(--text-main);
+}
+
+.answer-text .answer-list-item:last-child {
+  margin-bottom: 0;
+}
+
+.answer-text strong {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.answer-text code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background-color: var(--light-blush);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--accent-primary);
+}
+
+.answer-text a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.answer-text a:hover {
+  color: var(--accent-hover);
 }
 
 .unresolved-box {

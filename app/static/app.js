@@ -381,7 +381,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await resp.json();
       renderAgentResponse(data);
-      refreshUserState();
+      await refreshUserState();
+      checkHealth();
     } catch (err) {
       clearTimeout(timeoutId);
       stopWorkingTimer();
@@ -395,20 +396,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Health check with timeout
+  // Health check with provider-aware status handling
   async function checkHealth() {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const res = await fetch("/health", { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
-        const provider = data.provider || "ollama";
-        const model = data.model || "qwen2.5:3b";
-        statusText.textContent = `${provider} · ${model}`;
-        statusPill.className = "status-pill status-ready";
+        const provider = data.llm_provider || data.provider || "ollama";
+        const model = data.llm_model || data.model || "qwen2.5:3b";
+        const isDbHealthy = data.database === "connected";
+        const isLlmHealthy = Boolean(data.llm_healthy);
+        const isOk = data.status === "ok" && isDbHealthy && isLlmHealthy;
+
+        if (isOk) {
+          statusText.textContent = `Available (${provider} · ${model})`;
+          statusPill.className = "status-pill status-ready";
+        } else {
+          statusText.textContent = `Degraded (${provider})`;
+          statusPill.className = "status-pill status-degraded";
+        }
       } else {
         statusText.textContent = "Unavailable";
         statusPill.className = "status-pill status-unavailable";
@@ -594,32 +604,170 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  /**
+   * Safely renders a Markdown subset into a DOM container using pure DOM creation (document.createElement/createTextNode).
+   * Strictly adheres to CSP and XSS prevention (zero innerHTML/outerHTML/document.write/eval).
+   *
+   * Supported Markdown subset:
+   * - Headings (#, ##, ###, ####)
+   * - Unordered lists (- , * , + )
+   * - Ordered lists (1. , 2. )
+   * - Paragraphs (blank line separated)
+   * - Bold text (**text** or __text__)
+   * - Inline code (`code`)
+   * - Links ([title](url))
+   */
+  function renderInlineMarkdown(container, text) {
+    if (!text) return;
+    const tokenRegex = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = tokenRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        container.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+      }
+      const token = match[0];
+      if ((token.startsWith("**") && token.endsWith("**")) || (token.startsWith("__") && token.endsWith("__"))) {
+        const strong = document.createElement("strong");
+        strong.textContent = token.slice(2, -2);
+        container.appendChild(strong);
+      } else if (token.startsWith("`") && token.endsWith("`")) {
+        const code = document.createElement("code");
+        code.textContent = token.slice(1, -1);
+        container.appendChild(code);
+      } else if (token.startsWith("[")) {
+        const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+        if (linkMatch) {
+          const a = document.createElement("a");
+          a.textContent = linkMatch[1];
+          a.href = linkMatch[2];
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          container.appendChild(a);
+        } else {
+          container.appendChild(document.createTextNode(token));
+        }
+      }
+      lastIndex = tokenRegex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      container.appendChild(document.createTextNode(text.substring(lastIndex)));
+    }
+  }
+
+  function renderSafeMarkdown(container, markdownText) {
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+
+    if (!markdownText) return;
+
+    const lines = markdownText.split(/\r?\n/);
+    let currentList = null;
+
+    function closeList() {
+      currentList = null;
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const rawLine = lines[i];
+      const trimmed = rawLine.trim();
+
+      if (!trimmed) {
+        closeList();
+        continue;
+      }
+
+      // 1. Headings: #, ##, ###, ####
+      const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+      if (headingMatch) {
+        closeList();
+        const level = headingMatch[1].length;
+        const tag = level <= 2 ? "h3" : level === 3 ? "h4" : "h5";
+        const headingEl = document.createElement(tag);
+        headingEl.className = `answer-heading answer-${tag}`;
+        renderInlineMarkdown(headingEl, headingMatch[2]);
+        container.appendChild(headingEl);
+        continue;
+      }
+
+      // 2. Unordered lists: - item, * item, + item
+      const ulMatch = rawLine.match(/^(\s*)[-*+]\s+(.+)$/);
+      if (ulMatch) {
+        const itemText = ulMatch[2];
+        if (!currentList || currentList.type !== "ul") {
+          closeList();
+          const ul = document.createElement("ul");
+          ul.className = "answer-list answer-ul";
+          container.appendChild(ul);
+          currentList = { type: "ul", element: ul };
+        }
+        const li = document.createElement("li");
+        li.className = "answer-list-item";
+        renderInlineMarkdown(li, itemText);
+        currentList.element.appendChild(li);
+        continue;
+      }
+
+      // 3. Ordered lists: 1. item, 2. item
+      const olMatch = rawLine.match(/^(\s*)\d+\.\s+(.+)$/);
+      if (olMatch) {
+        const itemText = olMatch[2];
+        if (!currentList || currentList.type !== "ol") {
+          closeList();
+          const ol = document.createElement("ol");
+          ol.className = "answer-list answer-ol";
+          container.appendChild(ol);
+          currentList = { type: "ol", element: ol };
+        }
+        const li = document.createElement("li");
+        li.className = "answer-list-item";
+        renderInlineMarkdown(li, itemText);
+        currentList.element.appendChild(li);
+        continue;
+      }
+
+      // 4. Regular paragraph
+      closeList();
+      const p = document.createElement("p");
+      p.className = "answer-paragraph";
+      renderInlineMarkdown(p, trimmed);
+      container.appendChild(p);
+    }
+  }
+
+  window.renderSafeMarkdown = renderSafeMarkdown;
+
   // Render agent response safely
   function renderAgentResponse(data) {
     if (welcomeSection) welcomeSection.classList.add("hidden");
     if (emptyStateCard) emptyStateCard.classList.add("hidden");
 
     // 1. Answer Card & Grounded Refusal
-    answerText.textContent = data.answer || "No response generated.";
+    renderSafeMarkdown(answerText, data.answer || "No response generated.");
     answerCard.classList.remove("hidden");
 
     const isVerified = Boolean(data.verification && data.verification.passed);
     verificationBadge.textContent = isVerified ? "Verified" : "Needs Review";
     verificationBadge.className = `badge ${isVerified ? "badge-verified" : "badge-review"}`;
 
-    // Refusal handling: quiet neutral informational notice
+    // Refusal handling: quiet neutral informational notice for true empty refusals only
     const unresolved = (data.verification && data.verification.unresolved) || [];
     const answerLower = (data.answer || "").toLowerCase();
-    const isRefusal =
+    const hasEvidence = Array.isArray(data.tool_results) && data.tool_results.some((tr) => tr.data && (Array.isArray(tr.data) ? tr.data.length > 0 : true));
+    const isGuidanceOrRoadmap = answerLower.includes("roadmap") || answerLower.includes("first week") || answerLower.includes("preparation") || answerLower.includes("general guidance");
+    const isPureRefusal = !hasEvidence && !isGuidanceOrRoadmap && (
       unresolved.some((u) => u.toLowerCase().includes("no evidence found")) ||
       answerLower.includes("could not find") ||
-      answerLower.includes("no evidence found") ||
       answerLower.includes("not found in company records") ||
       answerLower.includes("no matching record") ||
-      answerLower.includes("cannot find");
+      answerLower.includes("cannot find")
+    );
 
     if (refusalBanner && refusalBannerText) {
-      if (isRefusal) {
+      if (isPureRefusal) {
         refusalBannerText.textContent = "No matching record in the company database.";
         refusalBanner.classList.remove("hidden");
       } else {

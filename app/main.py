@@ -241,25 +241,31 @@ async def root() -> RootResponse:
     "/health",
     response_model=HealthResponse,
     summary="Health Check",
-    description="Checks the health of the SQLite database connection and local Ollama instance.",
+    description="Checks the health of the SQLite database connection and active LLM provider.",
 )
-async def health() -> HealthResponse:
+def health() -> HealthResponse:
     db_healthy = check_database_health()
-    ollama_info = check_ollama_health()
 
     from app.agent.llm import check_active_llm_health
     active_llm = check_active_llm_health()
+    provider = active_llm.get("provider", "ollama")
+    llm_healthy = bool(active_llm.get("available"))
+    is_overall_ok = db_healthy and llm_healthy
 
-    provider_available = ollama_info.get("available", False) if active_llm.get("provider") == "ollama" else active_llm.get("available", False)
-    is_overall_ok = db_healthy and provider_available
+    ollama_info = None
+    if provider == "ollama":
+        ollama_info = active_llm.get("details")
+        if not ollama_info:
+            from app.llm import check_ollama_health
+            ollama_info = check_ollama_health()
 
     return HealthResponse(
         status="ok" if is_overall_ok else "degraded",
         database="connected" if db_healthy else "disconnected",
-        ollama=ollama_info,
-        llm_provider=active_llm.get("provider"),
+        ollama=ollama_info if ollama_info is not None else {"available": False, "provider": provider},
+        llm_provider=provider,
         llm_model=active_llm.get("model"),
-        llm_healthy=active_llm.get("available"),
+        llm_healthy=llm_healthy,
     )
 
 

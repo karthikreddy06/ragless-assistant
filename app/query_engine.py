@@ -62,7 +62,7 @@ def validate_and_refine_query_plan(
                     continue
 
             elif op.intent == "onboarding":
-                onboarding_keywords = ["onboarding", "checklist", "orientation", "new hire", "induction", "day 1", "tasks", "due"]
+                onboarding_keywords = ["onboarding", "checklist", "orientation", "new hire", "induction", "day 1", "tasks", "due", "first week", "first-week", "schedule"]
                 if not any(w in norm_q for w in onboarding_keywords):
                     continue
 
@@ -150,7 +150,7 @@ def validate_and_refine_query_plan(
             )
             has_company_employees = True
 
-    if any(w in norm_q for w in ["onboarding", "checklist", "orientation", "new hire", "induction"]):
+    if any(w in norm_q for w in ["onboarding", "checklist", "orientation", "new hire", "induction", "first week", "first-week", "first-week schedule", "first week schedule"]):
         already_has_onboarding = any(op.intent == "onboarding" for op in valid_ops)
         if not already_has_onboarding and len(valid_ops) < 5:
             dept_found = None
@@ -385,8 +385,8 @@ def detect_query_fast_path(
         if re.search(r"\b(?:how\s+many\s+(?:days|leave\s+days)|days\s+of|leave\s+allowance|leave\s+days|how\s+much\s+leave|allowance)\b", q_lower):
             return QueryPlan(queries=[QueryOperation(intent="leave_policy", query_type="leave_days", entity=leave)])
 
-    # 6. List onboarding items
-    if re.search(r"\b(?:list\s+(?:the\s+)?onboarding\s+items|what\s+are\s+(?:the\s+)?onboarding\s+(?:checklist\s+)?items|show\s+(?:the\s+)?onboarding\s+items|view\s+(?:the\s+)?onboarding\s+items|onboarding\s+checklist\s+items)\b", q_lower):
+    # 6. List onboarding items / first-week schedule
+    if re.search(r"\b(?:list\s+(?:the\s+)?onboarding\s+items|what\s+are\s+(?:the\s+)?onboarding\s+(?:checklist\s+)?items|show\s+(?:the\s+)?onboarding\s+items|view\s+(?:the\s+)?onboarding\s+items|onboarding\s+checklist\s+items|first\s+week\s+(?:onboarding\s+)?(?:checklist|schedule|items)|onboarding\s+schedule)\b", q_lower):
         return QueryPlan(queries=[QueryOperation(intent="onboarding", query_type="onboarding_checklist", entity=None)])
 
     return None
