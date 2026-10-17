@@ -69,21 +69,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             allow_local = os.getenv("ALLOW_LOCALHOST_IN_PROD", "false").lower() in ("true", "1", "yes")
 
             if not ollama_url:
-                err = "Production startup failed: OLLAMA_BASE_URL must be configured to point to a reachable, external Ollama server in production mode."
-                logger.critical(err)
-                raise RuntimeError(err)
-
-            if ("localhost" in ollama_url or "127.0.0.1" in ollama_url) and not (is_testing or allow_local):
+                logger.info(
+                    "OLLAMA_BASE_URL is unset at startup. Application starting in deterministic mode. "
+                    "AI features will gracefully notify callers that Ollama is not configured."
+                )
+            elif ("localhost" in ollama_url or "127.0.0.1" in ollama_url) and not (is_testing or allow_local):
                 err = (
                     f"Production startup failed: OLLAMA_BASE_URL ('{ollama_url}') points to localhost/127.0.0.1. "
                     "In cloud production (such as Render), configure OLLAMA_BASE_URL to point to your securely hosted Ollama server or tunnel."
                 )
-                logger.critical(err)
-                raise RuntimeError(err)
-        elif provider == "nebius":
-            nebius_key = os.getenv("NEBIUS_API_KEY", "").strip()
-            if not nebius_key or nebius_key == "your_nebius_api_key_here":
-                err = "Production startup failed: NEBIUS_API_KEY must be set when LLM_PROVIDER=nebius in production."
                 logger.critical(err)
                 raise RuntimeError(err)
     else:
@@ -216,6 +210,15 @@ async def ollama_connection_exception_handler(
 ) -> JSONResponse:
     """Handle Ollama connectivity issues without exposing stack traces."""
     logger.error("Ollama connection error: %s", exc)
+    from app.llm import is_ollama_configured
+    if not is_ollama_configured():
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "detail": "Ollama LLM service is not configured. Please set OLLAMA_BASE_URL to enable AI features.",
+                "error_type": "ollama_not_configured",
+            },
+        )
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
@@ -328,7 +331,8 @@ def health() -> HealthResponse:
     active_llm = check_active_llm_health()
     provider = active_llm.get("provider", "ollama")
     llm_healthy = bool(active_llm.get("available"))
-    is_overall_ok = db_healthy and llm_healthy
+    is_configured = bool(active_llm.get("configured", True))
+    is_overall_ok = db_healthy and (llm_healthy or not is_configured)
 
     ollama_info = None
     if provider == "ollama":
@@ -340,7 +344,7 @@ def health() -> HealthResponse:
     return HealthResponse(
         status="ok" if is_overall_ok else "degraded",
         database="connected" if db_healthy else "disconnected",
-        ollama=ollama_info if ollama_info is not None else {"available": False, "provider": provider},
+        ollama=ollama_info if ollama_info is not None else {"available": False, "configured": is_configured, "provider": provider},
         llm_provider=provider,
         llm_model=active_llm.get("model"),
         llm_healthy=llm_healthy,

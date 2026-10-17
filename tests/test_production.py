@@ -27,6 +27,7 @@ from app.llm import (
     get_ollama_headers,
     get_ollama_model,
     get_ollama_timeout,
+    is_ollama_configured,
     reset_ollama_cache,
 )
 from app.agent.llm import OllamaClient, get_llm_client
@@ -103,17 +104,18 @@ class TestProductionSecurityAndConcurrency(unittest.TestCase):
             asyncio.run(run_lifespan({"ENVIRONMENT": "production", "ADMIN_TOKEN": "your_admin_token_here"}))
         self.assertIn("ADMIN_TOKEN must be set to a secure, random secret", str(ctx.exception))
 
-        # 3. Missing OLLAMA_BASE_URL when LLM_PROVIDER=ollama in production
-        with self.assertRaises(RuntimeError) as ctx:
+        # 3. Missing OLLAMA_BASE_URL when LLM_PROVIDER=ollama in production must succeed (OLLAMA_BASE_URL is optional)
+        try:
             asyncio.run(run_lifespan({
                 "ENVIRONMENT": "production",
                 "ADMIN_TOKEN": "strong_secret_token_1234567890",
                 "LLM_PROVIDER": "ollama",
                 "OLLAMA_BASE_URL": "",
             }))
-        self.assertIn("OLLAMA_BASE_URL must be configured", str(ctx.exception))
+        except Exception as e:
+            self.fail(f"Production startup should succeed when OLLAMA_BASE_URL is unset/empty, but failed: {e}")
 
-        # 4. Success when ADMIN_TOKEN and external OLLAMA_BASE_URL are provided (no NEBIUS_API_KEY required)
+        # 4. Success when ADMIN_TOKEN and external OLLAMA_BASE_URL are provided
         try:
             asyncio.run(run_lifespan({
                 "ENVIRONMENT": "production",
@@ -318,6 +320,95 @@ class TestProductionSecurityAndConcurrency(unittest.TestCase):
             reset_ollama_cache()
             with self.assertRaises(OllamaModelNotFoundError):
                 _call_ollama_generate("test prompt")
+
+        reset_ollama_cache()
+
+    # 12. Startup and Health when Ollama is Unconfigured
+    def test_startup_and_health_without_ollama_configuration(self):
+        """Verify startup succeeds and health check reports status='ok' when Ollama is unconfigured."""
+        with patch.dict(os.environ, {
+            "ENVIRONMENT": "production",
+            "ADMIN_TOKEN": "production_secret_token_1234567890",
+            "OLLAMA_BASE_URL": "",
+        }):
+            reset_ollama_cache()
+            self.assertFalse(is_ollama_configured())
+            resp = self.client.get("/health")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertEqual(data["status"], "ok")
+            self.assertEqual(data["database"], "connected")
+            self.assertFalse(data["llm_healthy"])
+            self.assertEqual(data["llm_provider"], "ollama")
+            self.assertIn("ollama", data)
+            self.assertFalse(data["ollama"]["configured"])
+            self.assertFalse(data["ollama"]["available"])
+            self.assertIn("not configured", data["ollama"]["error"])
+
+        reset_ollama_cache()
+
+    # 13. Graceful handling of AI requests when Ollama is unconfigured
+    def test_ai_requests_when_ollama_unconfigured(self):
+        """Verify AI requests return safe messages when Ollama is not configured, while fast-path deterministic queries succeed."""
+        with patch.dict(os.environ, {
+            "ENVIRONMENT": "production",
+            "ADMIN_TOKEN": "production_secret_token_1234567890",
+            "OLLAMA_BASE_URL": "",
+            "FAST_PATH_ENABLED": "true",
+            "DETERMINISTIC_ANSWERS_ENABLED": "true",
+        }):
+            reset_ollama_cache()
+
+            # 1. Deterministic fast-path query succeeds against SQLite without Ollama
+            agent_resp = self.client.post("/agent/ask", json={
+                "question": "How many days of annual leave do employees get?",
+            })
+            self.assertEqual(agent_resp.status_code, 200)
+            agent_data = agent_resp.json()
+            self.assertIn("leave", agent_data["answer"].lower())
+            self.assertIn(agent_data["answer_mode"], ("template", "deterministic"))
+            self.assertEqual(agent_data.get("llm_calls_count", 0), 0)
+            self.assertTrue(agent_data["verification"]["passed"])
+
+            # 2. Open-ended query requiring LLM planner returns safe unconfigured message
+            open_resp = self.client.post("/agent/ask", json={
+                "question": "Can you draft a comprehensive strategic proposal for our new product expansion?",
+            })
+            self.assertEqual(open_resp.status_code, 200)
+            open_data = open_resp.json()
+            self.assertIn("Ollama LLM service is not configured", open_data["answer"])
+            self.assertFalse(open_data["verification"]["passed"])
+
+            # 3. Direct /ask pipeline returns 503 with ollama_not_configured error type
+            ask_resp = self.client.post("/ask", json={
+                "question": "What is the company mission?",
+            })
+            self.assertEqual(ask_resp.status_code, 503)
+            ask_data = ask_resp.json()
+            self.assertEqual(ask_data["error_type"], "ollama_not_configured")
+            self.assertIn("Ollama LLM service is not configured", ask_data["detail"])
+
+        reset_ollama_cache()
+
+    # 14. Graceful handling of AI requests when Ollama is configured but unavailable
+    def test_ai_requests_when_ollama_configured_but_unavailable(self):
+        """When Ollama is configured but unreachable, /ask returns 503 ollama_unavailable and agent gives unavailable notice."""
+        with patch.dict(os.environ, {
+            "OLLAMA_BASE_URL": "http://mock-unreachable-ollama:11434",
+            "FAST_PATH_ENABLED": "false",
+        }):
+            reset_ollama_cache()
+            with patch("requests.post", side_effect=requests.exceptions.ConnectionError("Connection refused")):
+                # /ask endpoint returns 503 with ollama_unavailable
+                resp = self.client.post("/ask", json={"question": "What is our leave policy?"})
+                self.assertEqual(resp.status_code, 503)
+                self.assertEqual(resp.json()["error_type"], "ollama_unavailable")
+
+                # /agent/ask returns 200 with clear unavailability notification
+                agent_resp = self.client.post("/agent/ask", json={"question": "Can you draft a strategy document?"})
+                self.assertEqual(agent_resp.status_code, 200)
+                self.assertIn("unavailable", agent_resp.json()["answer"].lower())
+                self.assertFalse(agent_resp.json()["verification"]["passed"])
 
         reset_ollama_cache()
 

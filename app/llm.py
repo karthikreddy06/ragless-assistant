@@ -21,9 +21,32 @@ OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "30"))
 _WORKING_URL: Optional[str] = None
 
 
-def get_ollama_base_url() -> str:
-    """Return the configured Ollama base URL from environment or default."""
-    return os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+def is_ollama_configured() -> bool:
+    """
+    Check whether Ollama endpoint is configured.
+    - In production (ENVIRONMENT=production or RENDER=true): OLLAMA_BASE_URL must be explicitly provided and non-empty.
+    - In development/testing: OLLAMA_BASE_URL defaults to http://localhost:11434 unless explicitly set to empty string.
+    """
+    raw = os.getenv("OLLAMA_BASE_URL")
+    is_prod = (
+        os.getenv("ENVIRONMENT", "").strip().lower() == "production"
+        or os.getenv("RENDER", "").strip().lower() == "true"
+    )
+    if is_prod:
+        return bool(raw and raw.strip())
+    if raw is not None:
+        return bool(raw.strip())
+    return True
+
+
+def get_ollama_base_url() -> Optional[str]:
+    """Return the configured Ollama base URL, or None if not configured."""
+    if not is_ollama_configured():
+        return None
+    url = os.getenv("OLLAMA_BASE_URL")
+    if url and url.strip():
+        return url.strip().rstrip("/")
+    return "http://localhost:11434"
 
 
 def get_ollama_model() -> str:
@@ -33,11 +56,11 @@ def get_ollama_model() -> str:
 
 def get_ollama_timeout() -> int:
     """Return the configured Ollama timeout in seconds."""
-    val = os.getenv("LLM_TIMEOUT_SECONDS") or os.getenv("OLLAMA_TIMEOUT") or "30"
+    val = os.getenv("LLM_TIMEOUT_SECONDS") or os.getenv("OLLAMA_TIMEOUT") or "60"
     try:
         return int(val)
     except ValueError:
-        return 30
+        return 60
 
 
 def get_ollama_api_key() -> Optional[str]:
@@ -80,9 +103,10 @@ class OllamaModelNotFoundError(OllamaError):
     pass
 
 
-def get_base_url() -> str:
+def get_base_url() -> Optional[str]:
     """
     Returns the resolved Ollama base URL.
+    - If Ollama is not configured, returns None.
     - If OLLAMA_BASE_URL is set to an external URL or Docker hostname (e.g. http://ollama:11434),
       it is returned directly without localhost probing.
     - If configured with localhost, verifies localhost and 127.0.0.1 for Windows/WSL flexibility.
@@ -92,6 +116,8 @@ def get_base_url() -> str:
         return _WORKING_URL
 
     configured = get_ollama_base_url()
+    if not configured:
+        return None
 
     # If pointing to a non-localhost endpoint (e.g. Docker container 'ollama', remote HTTPS, custom IP), use directly
     if "localhost" not in configured and "127.0.0.1" not in configured:
@@ -130,10 +156,32 @@ def check_ollama_health() -> Dict[str, Any]:
     Check if Ollama server is up and verify if the configured model is installed.
     Does not crash on failure; returns structured health status with secrets redacted.
     """
+    if not is_ollama_configured():
+        return {
+            "available": False,
+            "configured": False,
+            "base_url": None,
+            "model": get_ollama_model(),
+            "model_installed": False,
+            "installed_models": [],
+            "error": "Ollama LLM service is not configured (OLLAMA_BASE_URL is unset).",
+        }
+
     base_url = get_base_url()
     model = get_ollama_model()
     headers = get_ollama_headers()
     api_key = get_ollama_api_key()
+
+    if not base_url:
+        return {
+            "available": False,
+            "configured": False,
+            "base_url": None,
+            "model": model,
+            "model_installed": False,
+            "installed_models": [],
+            "error": "Ollama LLM service base URL could not be resolved.",
+        }
 
     try:
         resp = requests.get(f"{base_url}/api/tags", headers=headers, timeout=3)
@@ -175,7 +223,16 @@ def check_ollama_health() -> Dict[str, Any]:
 
 def _call_ollama_generate(prompt: str, json_format: bool = False, temperature: float = 0.0) -> str:
     """Internal helper to invoke Ollama's /api/generate endpoint."""
+    if not is_ollama_configured():
+        raise OllamaConnectionError(
+            "Ollama LLM service is not configured. Please set OLLAMA_BASE_URL to enable AI features."
+        )
+
     base_url = get_base_url()
+    if not base_url:
+        raise OllamaConnectionError(
+            "Ollama LLM service is not configured. Please set OLLAMA_BASE_URL to enable AI features."
+        )
     model = get_ollama_model()
     timeout = get_ollama_timeout()
     headers = get_ollama_headers()

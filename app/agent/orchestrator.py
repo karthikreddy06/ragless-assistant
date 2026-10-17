@@ -246,9 +246,17 @@ class AgentOrchestrator:
                     except (OllamaConnectionError, OllamaModelNotFoundError, OllamaError, NebiusError) as e:
                         logger.error("LLM communication error during planning: %s", e)
                         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                        from app.llm import is_ollama_configured
+                        if not is_ollama_configured():
+                            safe_msg = "Ollama LLM service is not configured. Please set OLLAMA_BASE_URL to enable AI-powered planning and responses."
+                            unresolved_reason = "Ollama LLM service is not configured (OLLAMA_BASE_URL is unset)."
+                        else:
+                            safe_msg = f"LLM service ({provider_name}) is currently unavailable or encountered an error. Details: {type(e).__name__}"
+                            unresolved_reason = f"LLM service '{provider_name}' unavailable during planning."
+
                         return AgentResponse(
                             question=clean_q,
-                            answer=f"LLM service ({provider_name}) is currently unavailable or encountered an error. Details: {type(e).__name__}",
+                            answer=safe_msg,
                             plan=None,
                             tool_results=[],
                             verification=Verification(
@@ -258,7 +266,7 @@ class AgentOrchestrator:
                                     passed=False,
                                     detail=str(e),
                                 )],
-                                unresolved=[f"LLM service '{provider_name}' unavailable during planning."],
+                                unresolved=[unresolved_reason],
                             ),
                             processing_time_ms=elapsed_ms,
                             llm_provider=provider_name,

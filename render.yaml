@@ -20,12 +20,8 @@ services:
         value: production
       - key: LLM_PROVIDER
         value: ollama
-      - key: OLLAMA_BASE_URL
-        sync: false
       - key: OLLAMA_MODEL
         value: qwen2.5:3b
-      - key: OLLAMA_API_KEY
-        sync: false
       - key: OLLAMA_TIMEOUT
         value: "60"
       - key: COOKIE_SECURE

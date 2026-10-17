@@ -17,6 +17,7 @@ from app.llm import (
     get_ollama_headers,
     get_ollama_model,
     get_ollama_timeout,
+    is_ollama_configured,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,7 +153,15 @@ class OllamaClient(LLMClient):
         temperature: float = 0.0,
         max_tokens: Optional[int] = None,
     ) -> str:
+        if not self._base_url and not is_ollama_configured():
+            raise OllamaConnectionError(
+                "Ollama LLM service is not configured. Please set OLLAMA_BASE_URL to enable AI features."
+            )
         base_url = self._base_url or get_base_url()
+        if not base_url:
+            raise OllamaConnectionError(
+                "Ollama LLM service is not configured. Please set OLLAMA_BASE_URL to enable AI features."
+            )
         url = f"{base_url}/api/generate"
 
         headers = {"Content-Type": "application/json"}
@@ -518,12 +527,13 @@ def check_active_llm_health() -> Dict[str, Any]:
     """
     provider = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
     if provider == "ollama":
-        from app.llm import check_ollama_health
+        from app.llm import check_ollama_health, is_ollama_configured
         ollama_status = check_ollama_health()
         return {
             "provider": "ollama",
-            "model": ollama_status.get("model", OLLAMA_MODEL),
+            "model": ollama_status.get("model", get_ollama_model()),
             "available": ollama_status.get("available", False),
+            "configured": ollama_status.get("configured", is_ollama_configured()),
             "details": ollama_status,
         }
     elif provider == "nebius":
