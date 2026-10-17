@@ -1,0 +1,40 @@
+# ==============================================================================
+# Render Blueprint Specification for RAGless Knowledge Assistant
+# Docs: https://render.com/docs/blueprint-spec
+# ==============================================================================
+
+services:
+  - type: web
+    name: ragless-assistant
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ENVIRONMENT
+        value: production
+      - key: LLM_PROVIDER
+        value: nebius
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: NEBIUS_BASE_URL
+        value: https://api.tokenfactory.nebius.com/v1/
+      - key: NEBIUS_MODEL
+        value: nvidia/nemotron-3-super-120b-a12b
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: FAST_PATH_ENABLED
+        value: "true"
+      - key: DETERMINISTIC_ANSWERS_ENABLED
+        value: "true"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      - key: ALLOWED_ORIGINS
+        value: ""

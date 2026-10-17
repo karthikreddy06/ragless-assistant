@@ -34,7 +34,7 @@ from app.models import (
 )
 from app.query_engine import process_query
 from app.agent.router import router as agent_router
-from app.auth import User, get_current_user, get_optional_current_user
+from app.auth import User, agent_rate_limiter, get_client_ip, get_current_user, get_optional_current_user
 from app.auth_router import router as auth_router
 
 # Configure application logging
@@ -47,13 +47,41 @@ logger = logging.getLogger("ragless-assistant")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Lifespan context manager for database initialization and startup checks."""
-    admin_token = os.getenv("ADMIN_TOKEN")
-    if not admin_token:
-        logger.warning(
-            "Security warning: ADMIN_TOKEN environment variable is unset. "
-            "/knowledge/import endpoint is accessible without authentication (local dev mode)."
-        )
+    """Lifespan context manager for database initialization, environment verification, and startup checks."""
+    is_production = (
+        os.getenv("ENVIRONMENT", "").strip().lower() == "production"
+        or os.getenv("RENDER", "").strip().lower() == "true"
+    )
+    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
+    weak_tokens = {"your_admin_token_here", "admin", "password", "secret", "123456", "test", "token", "changeme"}
+
+    if is_production:
+        if not admin_token or admin_token.lower() in weak_tokens or len(admin_token) < 16:
+            err = "Production startup failed: ADMIN_TOKEN must be set to a secure, random secret (at least 16 characters) in production mode."
+            logger.critical(err)
+            raise RuntimeError(err)
+
+        provider = os.getenv("LLM_PROVIDER", "nebius").strip().lower()
+        if provider == "nebius":
+            nebius_key = os.getenv("NEBIUS_API_KEY", "").strip()
+            if not nebius_key or nebius_key == "your_nebius_api_key_here":
+                err = "Production startup failed: NEBIUS_API_KEY must be set when LLM_PROVIDER=nebius in production."
+                logger.critical(err)
+                raise RuntimeError(err)
+        elif provider == "ollama":
+            from app.llm import check_ollama_health
+            status = check_ollama_health()
+            if not status.get("available"):
+                err = f"Production startup failed: Local Ollama is unreachable at {status.get('base_url')}. Configure LLM_PROVIDER=nebius with NEBIUS_API_KEY for cloud deployment."
+                logger.critical(err)
+                raise RuntimeError(err)
+    else:
+        if not admin_token:
+            logger.warning(
+                "Security warning: ADMIN_TOKEN environment variable is unset. "
+                "/knowledge/import endpoint is accessible without authentication (local dev mode)."
+            )
+
     logger.info("Initializing and verifying SQLite database...")
     initialize_database()
     seed_database()
@@ -78,7 +106,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title="RAGless Knowledge Assistant API",
     description=(
-        "A dynamic local AI knowledge assistant that uses Ollama (qwen2.5:3b) for natural-language "
+        "A dynamic local AI knowledge assistant that uses Ollama (qwen2.5:3b) or Nebius Token Factory for natural-language "
         "understanding and answer grounding, with SQLite as the deterministic single source of truth. "
         "Supports dynamic JSON knowledge ingestion. No vector databases, embeddings, or semantic similarity search."
     ),
@@ -86,14 +114,35 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for local development and UI integrations
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# Configure CORS safely based on environment
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
+is_production = (
+    os.getenv("ENVIRONMENT", "").strip().lower() == "production"
+    or os.getenv("RENDER", "").strip().lower() == "true"
 )
+
+if allowed_origins_env:
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+elif is_production:
+    # In production, default to same-origin only (empty list) unless explicitly configured
+    allowed_origins = []
+else:
+    # Local development origins
+    allowed_origins = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Admin-Token"],
+    )
 
 # Register Authentication & Agent Routers
 app.include_router(auth_router)
@@ -103,10 +152,28 @@ app.include_router(agent_router)
 @app.middleware("http")
 async def add_security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/ui"):
+
+    # Global baseline security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+
+    # Strict Content-Security-Policy on UI and HTML responses
+    if request.url.path.startswith("/ui") or request.url.path == "/":
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self';"
         )
+
+    # HSTS when HTTPS is active or COOKIE_SECURE is enabled
+    is_https = (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https"
+        or os.getenv("COOKIE_SECURE", "").strip().lower() in ("true", "1", "yes")
+    )
+    if is_https:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
     return response
 
 
@@ -298,9 +365,21 @@ async def import_knowledge(
     file: UploadFile = File(...),
     x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
 ) -> ImportSummaryResponse:
-    admin_token = os.getenv("ADMIN_TOKEN")
+    admin_token = os.getenv("ADMIN_TOKEN", "").strip()
+    is_production = (
+        os.getenv("ENVIRONMENT", "").strip().lower() == "production"
+        or os.getenv("RENDER", "").strip().lower() == "true"
+    )
+
+    if is_production and not admin_token:
+        logger.error("Blocked /knowledge/import: ADMIN_TOKEN is missing in production mode.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Knowledge import is disabled in production without configured ADMIN_TOKEN.",
+        )
+
     if admin_token:
-        if not x_admin_token or not hmac.compare_digest(x_admin_token.strip(), admin_token.strip()):
+        if not x_admin_token or not hmac.compare_digest(x_admin_token.strip(), admin_token):
             logger.warning("Rejected unauthorized knowledge import attempt.")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -355,10 +434,20 @@ async def import_knowledge(
     ),
     responses={
         422: {"model": ErrorResponse, "description": "Validation Error"},
+        429: {"model": ErrorResponse, "description": "Too Many Requests"},
         503: {"model": ErrorResponse, "description": "LLM Service Unavailable"},
     },
 )
-async def ask(payload: AskRequest) -> AskResponse:
+async def ask(payload: AskRequest, request: Request) -> AskResponse:
+    client_ip = get_client_ip(request)
+    is_limited, retry_after = agent_rate_limiter.check_and_record(f"ip:{client_ip}")
+    if is_limited:
+        logger.warning("Rate limit exceeded for /ask from IP %s (%ds remaining)", client_ip, retry_after)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded for queries. Please try again in {retry_after} seconds.",
+        )
+
     try:
         result = process_query(payload.question)
         return AskResponse(**result)

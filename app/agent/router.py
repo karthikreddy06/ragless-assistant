@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from app.agent.orchestrator import AgentOrchestrator
 from app.agent.schemas import AgentRequest, AgentResponse
-from app.auth import get_optional_current_user
+from app.auth import agent_rate_limiter, get_client_ip, get_optional_current_user
 from app.models import ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,16 @@ def ask_agent(payload: AgentRequest, request: Request) -> AgentResponse:
                 detail="Authentication required to run agent tasks for registered user accounts.",
             )
         effective_user_id = "demo-user"
+
+    # Enforce agent query rate limiting (per-user for authenticated, per-IP for demo users)
+    rate_key = f"user:{effective_user_id}" if effective_user_id != "demo-user" else f"ip:{get_client_ip(request)}"
+    is_limited, retry_after = agent_rate_limiter.check_and_record(rate_key)
+    if is_limited:
+        logger.warning("Agent rate limit exceeded for %s (%ds remaining)", rate_key, retry_after)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded for agent queries. Please try again in {retry_after} seconds.",
+        )
 
     try:
         orchestrator = get_orchestrator()

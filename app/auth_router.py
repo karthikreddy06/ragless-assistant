@@ -18,6 +18,7 @@ from app.auth import (
     get_current_user,
     invalidate_user_session,
     login_rate_limiter,
+    register_rate_limiter,
     register_user,
 )
 
@@ -39,7 +40,16 @@ def is_secure_cookie_required(request: Request) -> bool:
     summary="Register New User",
     description="Registers a new user account with Argon2id password hashing and unique email constraint.",
 )
-async def register(req: RegisterRequest) -> Dict[str, Any]:
+async def register(req: RegisterRequest, request: Request) -> Dict[str, Any]:
+    client_ip = get_client_ip(request)
+    is_limited, retry_after = register_rate_limiter.check_and_record(f"ip:{client_ip}")
+    if is_limited:
+        logger.warning("Registration rate limit exceeded from IP %s (%ds remaining)", client_ip, retry_after)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many registration attempts. Please try again in {retry_after} seconds.",
+        )
+
     user = register_user(req)
     logger.info("New user registered successfully: %s (%s)", user.user_id, user.email)
     return {

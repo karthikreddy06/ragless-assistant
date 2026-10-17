@@ -178,10 +178,11 @@ The following table reflects all configuration options defined in [`.env.example
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
+| `ENVIRONMENT` | `development` | Set to `production` in production mode to enforce strict secret checks |
 | `LLM_PROVIDER` | `ollama` | Active LLM provider: `ollama` (default local) or `nebius` (cloud client) |
-| `NEBIUS_API_KEY` | `your_nebius_api_key_here` | API key for OpenAI-compatible cloud client |
+| `NEBIUS_API_KEY` | `your_nebius_api_key_here` | API key for OpenAI-compatible cloud client (required when `LLM_PROVIDER=nebius`) |
 | `NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1/` | Base URL for OpenAI-compatible endpoint |
-| `NEBIUS_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Model identifier for cloud completions (unverified against provider's catalog; check via provider's models endpoint) |
+| `NEBIUS_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Model identifier for cloud completions |
 | `LLM_TIMEOUT_SECONDS`| `30` | Network timeout in seconds for cloud LLM requests |
 | `LLM_MAX_RETRIES` | `3` | Maximum retry attempts for transient cloud HTTP errors |
 | `LLM_TEMPERATURE` | `0.0` | Sampling temperature for LLM completions |
@@ -191,13 +192,73 @@ The following table reflects all configuration options defined in [`.env.example
 | `TAVILY_API_KEY` | `your_tavily_api_key_here` | API key for Tavily web search service |
 | `TAVILY_TIMEOUT_SECONDS`| `10` | Timeout in seconds for external web search |
 | `WEB_MAX_CALLS_PER_REQUEST`| `2` | Maximum outbound web queries allowed per single user turn |
-| `ADMIN_TOKEN` | `your_admin_token_here` | Header secret for `X-Admin-Token` on `/knowledge/import` |
+| `ADMIN_TOKEN` | `your_admin_token_here` | Header secret for `X-Admin-Token` on `/knowledge/import` (mandatory in production, min 16 chars) |
 | `FAST_PATH_ENABLED` | `true` | Enables deterministic fast-path plan routing |
 | `DETERMINISTIC_ANSWERS_ENABLED`| `true` | Enables zero-LLM template answers for simple factual queries |
 | `WARMUP_ON_STARTUP` | `false` | Sends an initial ping to Ollama during application startup |
 | `PLANNER_MAX_TOKENS`| `512` | Token limit for LLM plan generation |
 | `SYNTHESIS_MAX_TOKENS`| `512` | Token limit for LLM answer synthesis |
 | `DATABASE_PATH` | `knowledge.db` | SQLite database file location |
+| `COOKIE_SECURE` | `false` | Set to `true` to enforce the Secure flag on HttpOnly session cookies (required on HTTPS) |
+| `ALLOWED_ORIGINS` | `""` | Comma-separated list of allowed origins (empty defaults strictly to same-origin in production) |
+| `TRUST_PROXY_HEADERS` | `true` | Safely parses client IP from proxy-appended headers without IP spoofing |
+| `RATE_LIMIT_LOGIN_MAX`| `5` | Max failed login attempts before 300s lockout |
+| `RATE_LIMIT_REGISTER_MAX`| `5` | Max user registrations per IP within 300s window |
+| `RATE_LIMIT_AGENT_MAX`| `20` | Max agent queries per user/IP within 60s window |
+
+---
+
+## Production Deployment (Render Free Tier)
+
+RAGless is configured for straightforward zero-cost deployment on the **Render Free Tier** using cloud LLM inference (`LLM_PROVIDER=nebius`) and automated SQLite startup seeding.
+
+### Free-Tier Architecture & Characteristics
+- **Free Web Service (512 MB RAM)**: Local Ollama cannot run inside a 512 MB memory footprint without GPU. The production deployment routes to Nebius Token Factory or any OpenAI-compatible provider over HTTPS.
+- **Cold-Start Behavior**: Render free instances automatically spin down after 15 minutes of inactivity. When a new visitor accesses the application, the instance wakes up with a cold start delay of ~30–50 seconds.
+- **Database Persistence**: Free instances feature an ephemeral filesystem. On container startup, `seed_database()` automatically and idempotently populates SQLite from `data/sample_knowledge.json`. While custom registered user accounts and task changes are reset upon container spin-down, the full company knowledge base, leave policies, and onboarding checklists are 100% available for public evaluation.
+- **In-Memory Rate Limiting**: Request and login rate limits operate in-process. Counters reset upon container restart or sleep.
+
+### Deploying via Render Blueprint (`render.yaml`)
+
+1. Fork or push this repository to GitHub.
+2. In your [Render Dashboard](https://dashboard.render.com), click **New** > **Blueprint**.
+3. Select this repository. Render will automatically parse [`render.yaml`](render.yaml):
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers`
+   - **Health Check Path**: `/health`
+4. In the Blueprint parameters, enter your **`NEBIUS_API_KEY`** (Render automatically generates a secure 32-character `ADMIN_TOKEN`).
+5. Click **Apply**. Once deployed, navigate to `https://<your-service-name>.onrender.com/ui/`.
+
+### Manual Deployment on Render (Without Blueprint)
+
+If creating the web service manually:
+1. Click **New** > **Web Service** > Connect your repository.
+2. Configure settings:
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers`
+   - **Plan**: `Free`
+   - **Health Check Path**: `/health`
+3. Add Environment Variables:
+   - `PYTHON_VERSION`: `3.11.9`
+   - `ENVIRONMENT`: `production`
+   - `LLM_PROVIDER`: `nebius`
+   - `NEBIUS_API_KEY`: `<your_cloud_api_key>`
+   - `COOKIE_SECURE`: `true`
+   - `ADMIN_TOKEN`: `<random_secret_at_least_16_characters>`
+   - `FAST_PATH_ENABLED`: `true`
+   - `DETERMINISTIC_ANSWERS_ENABLED`: `true`
+   - `TRUST_PROXY_HEADERS`: `true`
+4. Click **Create Web Service**.
+
+### How to Run Tests Locally
+```bash
+# Run all fast unit and integration tests (227 tests)
+pytest -m "not slow"
+
+# Run tests with production security validations
+pytest tests/test_production.py -v
+```
 
 ---
 

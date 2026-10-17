@@ -18,12 +18,22 @@ def get_database_path() -> Path:
 DATABASE_PATH = DEFAULT_DATABASE_PATH
 
 
-def get_connection() -> sqlite3.Connection:
-    """Create and return a SQLite connection with Row factory enabled."""
+def get_connection(timeout: float = 10.0) -> sqlite3.Connection:
+    """
+    Create and return a SQLite connection with Row factory enabled,
+    WAL (Write-Ahead Logging) mode, foreign key enforcement, and a busy timeout
+    to prevent lock contention under concurrent access.
+    """
     db_path = get_database_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(db_path)
+    connection = sqlite3.connect(db_path, timeout=timeout)
     connection.row_factory = sqlite3.Row
+    try:
+        connection.execute("PRAGMA journal_mode=WAL;")
+        connection.execute("PRAGMA foreign_keys=ON;")
+        connection.execute(f"PRAGMA busy_timeout={int(timeout * 1000)};")
+    except sqlite3.Error:
+        pass
     return connection
 
 

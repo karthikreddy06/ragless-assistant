@@ -11,7 +11,7 @@ from app.database import get_connection, initialize_database, seed_database
 from app.main import app
 from app.agent.tasks import get_task_store
 from app.agent.memory import get_memory_store
-from app.auth import LoginRateLimiter, login_rate_limiter
+from app.auth import LoginRateLimiter, login_rate_limiter, register_rate_limiter, agent_rate_limiter
 
 
 class TestUserAuthenticationAndIsolation(unittest.TestCase):
@@ -27,6 +27,8 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         self.env_patcher.start()
 
         login_rate_limiter.reset()
+        register_rate_limiter.reset()
+        agent_rate_limiter.reset()
 
         initialize_database()
         seed_database()
@@ -34,6 +36,9 @@ class TestUserAuthenticationAndIsolation(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self):
+        login_rate_limiter.reset()
+        register_rate_limiter.reset()
+        agent_rate_limiter.reset()
         self.env_patcher.stop()
         self.temp_dir.cleanup()
 

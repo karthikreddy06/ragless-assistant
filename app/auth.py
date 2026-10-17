@@ -74,14 +74,83 @@ class LoginRateLimiter:
             self._lockouts.clear()
 
 
-login_rate_limiter = LoginRateLimiter(max_failures=5, lockout_seconds=300)
+class RequestRateLimiter:
+    """
+    In-memory sliding-window rate limiter for protecting expensive or sensitive endpoints.
+    Tracks request timestamps per key (e.g. IP address or user ID).
+
+    OPERATIONAL & ARCHITECTURAL LIMITATIONS:
+    - In-memory state is tied to this specific process instance.
+    - Counters reset on application restarts or free-tier serverless container sleeps.
+    - Not synchronized across multi-process workers (e.g. multi-worker Gunicorn/Uvicorn).
+    - For distributed/multi-worker deployments, a shared store (e.g. Redis) is required.
+    """
+    def __init__(self, max_requests: int = 20, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._requests: Dict[str, List[float]] = {}
+        self._lock = threading.Lock()
+
+    def check_and_record(self, key: str) -> tuple[bool, int]:
+        """
+        Atomically checks if the key is within rate limits.
+        If under limit, records the request timestamp and returns (False, 0).
+        If limit is exceeded, returns (True, retry_after_seconds).
+        """
+        with self._lock:
+            now = time.time()
+            cutoff = now - self.window_seconds
+            timestamps = [t for t in self._requests.get(key, []) if t > cutoff]
+            if len(timestamps) >= self.max_requests:
+                earliest = timestamps[0]
+                retry_after = max(1, int(earliest + self.window_seconds - now))
+                self._requests[key] = timestamps
+                return True, retry_after
+            timestamps.append(now)
+            self._requests[key] = timestamps
+            return False, 0
+
+    def reset(self) -> None:
+        with self._lock:
+            self._requests.clear()
+
+
+# Configurable Rate Limiter Instances
+login_rate_limiter = LoginRateLimiter(
+    max_failures=int(os.getenv("RATE_LIMIT_LOGIN_MAX", "5")),
+    lockout_seconds=int(os.getenv("RATE_LIMIT_LOGIN_WINDOW", "300")),
+)
+
+register_rate_limiter = RequestRateLimiter(
+    max_requests=int(os.getenv("RATE_LIMIT_REGISTER_MAX", "5")),
+    window_seconds=int(os.getenv("RATE_LIMIT_REGISTER_WINDOW", "300")),
+)
+
+agent_rate_limiter = RequestRateLimiter(
+    max_requests=int(os.getenv("RATE_LIMIT_AGENT_MAX", "20")),
+    window_seconds=int(os.getenv("RATE_LIMIT_AGENT_WINDOW", "60")),
+)
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP address, checking X-Forwarded-For if available."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """
+    Safely extract the client IP address.
+
+    Security & Proxy Handling:
+    - When behind a trusted reverse proxy (e.g. Render, Nginx), the proxy appends
+      the verified remote address to the end of the X-Forwarded-For header.
+      Taking the rightmost entry prevents client IP spoofing attacks.
+    - If proxy headers are not trusted (or in direct connections without proxy),
+      falls back directly to request.client.host.
+    """
+    trust_proxies = os.getenv("TRUST_PROXY_HEADERS", "true").strip().lower() in ("true", "1", "yes")
+    if trust_proxies:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+            if parts:
+                return parts[-1]
+
     if request.client and request.client.host:
         return request.client.host
     return "127.0.0.1"
