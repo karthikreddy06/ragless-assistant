@@ -225,58 +225,113 @@ The following table reflects all configuration options defined in [`.env.example
 
 ---
 
-## Production Deployment (Render Free Tier + External Ollama)
+## Production Deployment (Render Free Tier + Protected Local Ollama)
 
-RAGless is configured for zero-cost deployment on the **Render Free Tier** (`plan: free`, 512 MB RAM).
+RAGless is configured for zero-cost deployment on the **Render Free Tier** using two complementary services defined in [`render.yaml`](render.yaml):
+1. **Backend Web Service (`ragless-assistant`)**: Free Python service (512 MB RAM) running FastAPI, SQLite with WAL mode, and defense-in-depth query orchestration.
+2. **Frontend Static Site (`ragless-assistant-ui`)**: Free static site hosting the responsive Vanilla JS/CSS client directly from `app/static/`.
 
 ### Free-Tier Architecture & Characteristics
-- **Free Web Service (512 MB RAM)**: Render's free tier provides 512 MB memory, which is ideal for the lightweight FastAPI + SQLite backend. However, running a quantized LLM like `qwen2.5:3b` in Ollama requires 2–4 GB RAM and GPU acceleration. Therefore, the production architecture connects Render to a **separately hosted Ollama instance**.
-- **Cold-Start Behavior**: Render free instances automatically spin down after 15 minutes of inactivity. When a new visitor accesses the application, the instance wakes up with a cold start delay of ~30–50 seconds.
-- **Database Persistence**: Free instances feature an ephemeral filesystem. On container startup, `seed_database()` automatically populates SQLite from `data/sample_knowledge.json`. Full company knowledge base, leave policies, and onboarding checklists are 100% available on every wakeup.
+- **Zero Cost & No Credit Card**: Both the Web Service and Static Site operate on Render's genuine free tier (`plan: free`).
+- **Dynamic API Resolution**: When deployed on Render Static Sites (or any separate domain), `app/static/app.js` automatically targets `https://ragless-assistant.onrender.com`. All API requests (`/auth/*`, `/agent/ask`, `/tasks/*`, `/health`) transmit credentials with automatic `Authorization: Bearer <session_id>` fallback for cross-origin environments.
+- **Root URL Experience**: Visiting `/` in a browser automatically redirects (`307 Temporary Redirect`) to `/ui/`, while API clients and automated tests requesting JSON receive structured `RootResponse` metadata.
+- **Backend CORS Enforcement**: Strict CORS headers allow requests exclusively from `https://ragless-assistant-ui.onrender.com` (and same-origin backend mounts). Wildcard origins (`*`) with credentials are never permitted.
+- **Cold-Start Behavior**: Render free web services spin down after 15 minutes of inactivity. The first request after sleep requires ~30–50 seconds to initialize. The frontend UI displays connection statuses gracefully during wake-ups.
+- **Ephemeral Filesystem**: On container startup, SQLite database seeding automatically loads `data/sample_knowledge.json`. Company knowledge, leave policies, and onboarding checklists are 100% available on every wakeup.
 
-### Secure External Ollama Networking (CRITICAL)
+---
+
+### Secure Local Ollama Connectivity (CRITICAL)
+
 > [!CAUTION]
-> **Never expose Ollama's unauthenticated API (`0.0.0.0:11434`) directly to the public internet.** Doing so allows anyone to consume your GPU/CPU, pull large models, or flood your machine.
+> **Never expose Ollama's unauthenticated API (`0.0.0.0:11434`) directly to the public internet.** Ollama has no built-in authentication or request filtering. Exposing it directly allows anyone to flood your machine, pull arbitrary models, or exhaust GPU/CPU memory.
 
-To securely connect Render to Ollama running on your local computer or VPS:
+To safely connect your Render backend to Ollama (`qwen2.5:3b`) running on your local Windows PC:
 
-1. **Option A — Cloudflare Tunnel (Recommended & Free)**:
-   - Install `cloudflared` on your machine where Ollama is running.
-   - Run `cloudflared tunnel --url http://localhost:11434`.
-   - Protect your tunnel endpoint with Cloudflare Access or a secret HTTP header/token.
-   - In Render, configure `OLLAMA_BASE_URL=https://your-tunnel.trycloudflare.com` and `OLLAMA_API_KEY=<token>`.
+```
+[Render Web Service]
+        │ HTTPS (Bearer Token)
+        ▼
+[Cloudflare Quick Tunnel (*.trycloudflare.com)]
+        │ Encrypted Tunnel
+        ▼
+[scripts/ollama_proxy.py (127.0.0.1:11435)]
+  ├── 1. Validates Authorization: Bearer <secret>
+  ├── 2. Blocks all methods/routes except whitelist:
+  │      GET /api/tags, POST /api/generate, GET /api/version
+  └── 3. Sanitizes timeouts (504) and connection drops (502)
+        │ Localhost HTTP
+        ▼
+[Local Ollama (127.0.0.1:11434)]
+```
 
-2. **Option B — Reverse Proxy (Caddy / Nginx) with Bearer Token**:
-   - Place Caddy or Nginx in front of Ollama with HTTPS (Let's Encrypt).
-   - Enforce Bearer token authentication in Nginx/Caddy configuration.
-   - Configure `OLLAMA_BASE_URL=https://ollama.yourdomain.com` and `OLLAMA_API_KEY=<secret>` in Render.
+#### Step 1: Start the Authenticated Reverse Proxy
+The proxy is implemented in [`scripts/ollama_proxy.py`](scripts/ollama_proxy.py) using Python's standard library (zero external dependencies). It binds strictly to `127.0.0.1:11435`:
 
-### What Must Run For the Public AI Demo to Work
-For the public Render demo to complete end-to-end AI reasoning:
-1. Your external Ollama server (or local machine with Cloudflare Tunnel) must be running with model `qwen2.5:3b` pulled.
-2. The tunnel or reverse proxy URL must be set in Render's `OLLAMA_BASE_URL` environment variable.
-3. *Note*: Even if Ollama is temporarily offline, the deterministic fast-path and template answers (e.g. employee headcounts, location, leave days) will continue to return instant grounded answers from SQLite without error.
+```powershell
+# Set a strong proxy authorization secret
+$env:OLLAMA_PROXY_SECRET="your-strong-random-secret-here"
+
+# Start the proxy
+python scripts/ollama_proxy.py
+```
+
+- **Authentication**: Requires `Authorization: Bearer <secret>` or `X-Ollama-Key: <secret>` verified via constant-time string comparison (`hmac.compare_digest`). Unauthenticated requests receive `401 Unauthorized`.
+- **Endpoint Whitelist**: Only `GET /api/tags`, `POST /api/generate`, `GET /api/version`, and `GET /health` are permitted. Destructive endpoints (`/api/pull`, `/api/delete`, `/api/push`) or other HTTP verbs (`DELETE`, `PUT`) are rejected with `403 Forbidden`.
+- **Error Sanitization**: Upstream connection failures return `502 Bad Gateway` and timeouts return `504 Gateway Timeout` without leaking system stack traces.
+
+#### Step 2: Expose the Proxy via Cloudflare Quick Tunnel (Free, No Domain Required)
+If you do not own a custom domain, you can use a free Cloudflare Quick Tunnel to route Render traffic to your proxy:
+
+```powershell
+# In a separate terminal, launch a free Quick Tunnel pointing to the proxy port:
+cloudflared tunnel --url http://127.0.0.1:11435
+```
+
+Cloudflare generates a temporary public HTTPS URL (e.g., `https://random-words.trycloudflare.com`).
+
+> [!NOTE]
+> **Quick Tunnel Limitations & Restart Behavior**:
+> - **Ephemeral Hostname**: Every time you restart `cloudflared tunnel`, a new temporary URL is generated.
+> - **Updating Render**: When you restart the tunnel, update the `OLLAMA_BASE_URL` environment variable in your Render Web Service dashboard with the new URL.
+> - **Local Machine Requirement**: Your PC and Ollama must remain running and connected to the internet while testing remote LLM completions.
+> - **Graceful Offline Fallback**: If Ollama or the tunnel is offline, all deterministic features (onboarding workflows, task creation, leave policy queries, location lookups) continue working with zero downtime.
+
+#### Step 3: Configure Render Web Service Environment
+In your Render Dashboard for `ragless-assistant`:
+- `OLLAMA_BASE_URL`: `https://your-tunnel.trycloudflare.com`
+- `OLLAMA_API_KEY`: `your-strong-random-secret-here` (matching `$env:OLLAMA_PROXY_SECRET`)
+- `OLLAMA_MODEL`: `qwen2.5:3b`
+
+---
 
 ### Deploying via Render Blueprint (`render.yaml`)
 
-1. Fork or push this repository to GitHub.
+1. Push your changes to your GitHub repository.
 2. In your [Render Dashboard](https://dashboard.render.com), click **New** > **Blueprint**.
-3. Select this repository. Render automatically reads [`render.yaml`](render.yaml):
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers`
-   - **Health Check Path**: `/health`
-   - **Plan**: `Free`
-4. In the Blueprint parameters, enter your **`OLLAMA_BASE_URL`** (and optional `OLLAMA_API_KEY`). Render automatically generates a 32-character `ADMIN_TOKEN`.
-5. Click **Apply**.
+3. Select your repository. Render parses [`render.yaml`](render.yaml) and provisions:
+   - **`ragless-assistant`** (Web Service, Python, free)
+   - **`ragless-assistant-ui`** (Static Site, free)
+4. Click **Apply**.
 
-### How to Run Tests Locally
+---
+
+### Verification and Automated Testing
+
 ```bash
-# Run all fast unit and integration tests
-pytest -m "not slow"
+# 1. Run full non-slow test suite (including proxy and security checks)
+pytest -m "not slow" -v
 
-# Run tests with production security validations
-pytest tests/test_production.py -v
+# 2. Run automated proxy unit tests
+pytest tests/test_ollama_proxy.py -v
+
+# 3. Test responsive UI stylesheet rules
+python scripts/verify_responsive.py
+
+# 4. Verify live Render deployment endpoints
+python scripts/verify_live_render.py
 ```
+
 
 ---
 
@@ -337,8 +392,10 @@ python -m pytest tests/test_backend.py -m "slow" -q --durations=5
 - `tests/test_tasks.py`: **20 passed** (task lifecycle, task limits, user isolation, imperative intent validation)
 - `tests/test_web_research.py`: **35 passed** (Tavily HTTP client, cache, outbound query guards, taint tracking)
 - `tests/test_nebius.py`: **20 passed** (mocked OpenAI provider client, thinking token stripper, secret redaction)
-- `tests/test_ui.py`: **6 passed** (CSP header verification, static asset delivery, zero-innerHTML DOM checks)
-- **Total: 228 automated unit/integration tests passing (10 live cloud/web tests safely skipped when credentials unset)**
+- `tests/test_ui.py`: **9 passed** (CSP header verification, static asset delivery, zero-innerHTML DOM checks, safe markdown rendering)
+- `tests/test_production.py`: **16 passed** (Render production startup, WAL concurrency, CORS, security headers, rate limiting)
+- `tests/test_ollama_proxy.py`: **10 passed** (token authentication, endpoint allowlisting, 403 blocking, 502/504 error handling)
+- **Total: 264 automated unit/integration tests (244 fast passing + 20 slow local Ollama; 10 live cloud/web tests safely skipped when credentials unset)**
 
 ---
 

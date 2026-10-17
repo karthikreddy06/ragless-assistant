@@ -104,6 +104,49 @@ document.addEventListener("DOMContentLoaded", () => {
   let startTime = 0;
   let currentUser = null;
 
+  // Dynamic API base URL resolution:
+  // 1. Explicit window.API_BASE_URL override if defined
+  // 2. If running on a remote origin that is not the backend itself (e.g. Render Static Site ragless-assistant-ui.onrender.com),
+  //    direct API requests to the live backend https://ragless-assistant.onrender.com
+  // 3. Otherwise (localhost / 127.0.0.1 or same-origin backend /ui mount), use relative path ""
+  const API_BASE = (function () {
+    if (window.API_BASE_URL) {
+      return window.API_BASE_URL.replace(/\/+$/, "");
+    }
+    const host = window.location.hostname;
+    const origin = window.location.origin;
+    if (host !== "localhost" && host !== "127.0.0.1" && !origin.includes("ragless-assistant.onrender.com")) {
+      return "https://ragless-assistant.onrender.com";
+    }
+    return "";
+  })();
+
+  function apiUrl(path) {
+    if (!path.startsWith("/")) path = "/" + path;
+    return `${API_BASE}${path}`;
+  }
+
+  function getSessionToken() {
+    return sessionStorage.getItem("ragless_session_id") || "";
+  }
+
+  function setSessionToken(token) {
+    if (token) {
+      sessionStorage.setItem("ragless_session_id", token);
+    } else {
+      sessionStorage.removeItem("ragless_session_id");
+    }
+  }
+
+  function authHeaders(extra = {}) {
+    const headers = { ...extra };
+    const token = getSessionToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
   // View management helpers
   function showAuthView(mode = "login", errorMsg = "") {
     currentUser = null;
@@ -148,7 +191,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function checkSession() {
     try {
-      const res = await fetch("/auth/me");
+      const res = await fetch(apiUrl("/auth/me"), {
+        credentials: "include",
+        headers: authHeaders(),
+      });
       if (res.ok) {
         const user = await res.json();
         showDashboardView(user);
@@ -197,13 +243,18 @@ document.addEventListener("DOMContentLoaded", () => {
       if (originalSpan) originalSpan.textContent = "Signing In...";
 
       try {
-        const res = await fetch("/auth/login", {
+        const res = await fetch(apiUrl("/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ email, password }),
         });
 
         if (res.ok) {
+          const authData = await res.json().catch(() => ({}));
+          if (authData.session_id) {
+            setSessionToken(authData.session_id);
+          }
           loginForm.reset();
           await checkSession();
         } else {
@@ -256,9 +307,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (originalSpan) originalSpan.textContent = "Creating Account...";
 
       try {
-        const res = await fetch("/auth/register", {
+        const res = await fetch(apiUrl("/auth/register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             full_name: fullName,
             email,
@@ -269,12 +321,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (res.status === 201) {
           registerSuccessAlert.classList.remove("hidden");
-          const loginRes = await fetch("/auth/login", {
+          const loginRes = await fetch(apiUrl("/auth/login"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({ email, password }),
           });
           if (loginRes.ok) {
+            const authData = await loginRes.json().catch(() => ({}));
+            if (authData.session_id) {
+              setSessionToken(authData.session_id);
+            }
             registerForm.reset();
             await checkSession();
           } else {
@@ -303,8 +360,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // Logout Handler
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
+      setSessionToken("");
       try {
-        await fetch("/auth/logout", { method: "POST" });
+        await fetch(apiUrl("/auth/logout"), {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders(),
+        });
       } catch {
         // Proceed to show login
       }
@@ -357,9 +419,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 150000); // 150s timeout
 
     try {
-      const resp = await fetch("/agent/ask", {
+      const resp = await fetch(apiUrl("/agent/ask"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        credentials: "include",
         body: JSON.stringify({ question, user_id: userId }),
         signal: controller.signal,
       });
@@ -402,7 +465,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const res = await fetch("/health", { signal: controller.signal });
+      const res = await fetch(apiUrl("/health"), {
+        signal: controller.signal,
+        credentials: "include",
+      });
       clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
@@ -410,10 +476,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const model = data.llm_model || data.model || "qwen2.5:3b";
         const isDbHealthy = data.database === "connected";
         const isLlmHealthy = Boolean(data.llm_healthy);
+        const isConfigured = data.ollama?.configured !== false;
         const isOk = data.status === "ok" && isDbHealthy && isLlmHealthy;
 
         if (isOk) {
           statusText.textContent = `Available (${provider} · ${model})`;
+          statusPill.className = "status-pill status-ready";
+        } else if (isDbHealthy && !isConfigured) {
+          statusText.textContent = "Ready (Deterministic · SQLite)";
           statusPill.className = "status-pill status-ready";
         } else {
           statusText.textContent = `Degraded (${provider})`;
@@ -437,7 +507,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchMemory() {
     try {
-      const res = await fetch("/memory/me");
+      const res = await fetch(apiUrl("/memory/me"), {
+        credentials: "include",
+        headers: authHeaders(),
+      });
       if (res.status === 401) {
         showAuthView("login", "Your session has expired. Please log in again.");
         return;
@@ -471,7 +544,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchTasks() {
     try {
-      const res = await fetch("/tasks/me");
+      const res = await fetch(apiUrl("/tasks/me"), {
+        credentials: "include",
+        headers: authHeaders(),
+      });
       if (res.status === 401) {
         showAuthView("login", "Your session has expired. Please log in again.");
         return;

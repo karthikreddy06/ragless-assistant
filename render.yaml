@@ -35,4 +35,14 @@ services:
       - key: TRUST_PROXY_HEADERS
         value: "true"
       - key: ALLOWED_ORIGINS
-        value: ""
+        value: "https://ragless-assistant-ui.onrender.com"
+
+  - type: static
+    name: ragless-assistant-ui
+    plan: free
+    staticPublishPath: app/static
+    buildCommand: ""
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

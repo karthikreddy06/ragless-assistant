@@ -129,8 +129,11 @@ is_production = (
 if allowed_origins_env:
     allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
 elif is_production:
-    # In production, default to same-origin only (empty list) unless explicitly configured
-    allowed_origins = []
+    # In production, default to deployed Render static site origin and backend origin
+    allowed_origins = [
+        "https://ragless-assistant-ui.onrender.com",
+        "https://ragless-assistant.onrender.com",
+    ]
 else:
     # Local development origins
     allowed_origins = [
@@ -138,6 +141,8 @@ else:
         "http://127.0.0.1:8000",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ]
 
 if allowed_origins:
@@ -167,7 +172,7 @@ async def add_security_headers_middleware(request: Request, call_next):
     # Strict Content-Security-Policy on UI and HTML responses
     if request.url.path.startswith("/ui") or request.url.path == "/":
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self';"
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://ragless-assistant.onrender.com;"
         )
 
     # HSTS when HTTPS is active or COOKIE_SECURE is enabled
@@ -293,7 +298,13 @@ async def general_exception_handler(
     summary="Root Status",
     description="Returns basic API information, status, and links to documentation.",
 )
-async def root() -> RootResponse:
+async def root(request: Request):
+    # If a web browser directly navigates to / requesting HTML, redirect to the chat interface /ui/
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and not accept.startswith("*/*"):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/ui/", status_code=307)
+
     return RootResponse(
         message="RAGless Knowledge Assistant API is running.",
         status="active",
@@ -301,6 +312,7 @@ async def root() -> RootResponse:
         project="RAGless Knowledge Assistant",
         endpoints={
             "root": "/",
+            "ui": "/ui/",
             "health": "/health",
             "auth_register": "/auth/register",
             "auth_login": "/auth/login",
