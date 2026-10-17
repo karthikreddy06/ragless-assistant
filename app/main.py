@@ -61,18 +61,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.critical(err)
             raise RuntimeError(err)
 
-        provider = os.getenv("LLM_PROVIDER", "nebius").strip().lower()
-        if provider == "nebius":
+        provider = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
+        if provider == "ollama":
+            ollama_url = os.getenv("OLLAMA_BASE_URL", "").strip()
+            import sys
+            is_testing = "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") is not None
+            allow_local = os.getenv("ALLOW_LOCALHOST_IN_PROD", "false").lower() in ("true", "1", "yes")
+
+            if not ollama_url:
+                err = "Production startup failed: OLLAMA_BASE_URL must be configured to point to a reachable, external Ollama server in production mode."
+                logger.critical(err)
+                raise RuntimeError(err)
+
+            if ("localhost" in ollama_url or "127.0.0.1" in ollama_url) and not (is_testing or allow_local):
+                err = (
+                    f"Production startup failed: OLLAMA_BASE_URL ('{ollama_url}') points to localhost/127.0.0.1. "
+                    "In cloud production (such as Render), configure OLLAMA_BASE_URL to point to your securely hosted Ollama server or tunnel."
+                )
+                logger.critical(err)
+                raise RuntimeError(err)
+        elif provider == "nebius":
             nebius_key = os.getenv("NEBIUS_API_KEY", "").strip()
             if not nebius_key or nebius_key == "your_nebius_api_key_here":
                 err = "Production startup failed: NEBIUS_API_KEY must be set when LLM_PROVIDER=nebius in production."
-                logger.critical(err)
-                raise RuntimeError(err)
-        elif provider == "ollama":
-            from app.llm import check_ollama_health
-            status = check_ollama_health()
-            if not status.get("available"):
-                err = f"Production startup failed: Local Ollama is unreachable at {status.get('base_url')}. Configure LLM_PROVIDER=nebius with NEBIUS_API_KEY for cloud deployment."
                 logger.critical(err)
                 raise RuntimeError(err)
     else:

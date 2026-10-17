@@ -5,6 +5,7 @@ import os
 import sqlite3
 import unittest
 from unittest.mock import patch
+import requests
 
 from fastapi.testclient import TestClient
 
@@ -15,6 +16,20 @@ from app.auth import (
     register_rate_limiter,
 )
 from app.database import get_connection, initialize_database
+from app.llm import (
+    OllamaConnectionError,
+    OllamaError,
+    OllamaModelNotFoundError,
+    _call_ollama_generate,
+    check_ollama_health,
+    get_base_url,
+    get_ollama_base_url,
+    get_ollama_headers,
+    get_ollama_model,
+    get_ollama_timeout,
+    reset_ollama_cache,
+)
+from app.agent.llm import OllamaClient, get_llm_client
 from app.main import app, lifespan
 
 
@@ -88,15 +103,26 @@ class TestProductionSecurityAndConcurrency(unittest.TestCase):
             asyncio.run(run_lifespan({"ENVIRONMENT": "production", "ADMIN_TOKEN": "your_admin_token_here"}))
         self.assertIn("ADMIN_TOKEN must be set to a secure, random secret", str(ctx.exception))
 
-        # 3. Missing NEBIUS_API_KEY when LLM_PROVIDER=nebius in production
+        # 3. Missing OLLAMA_BASE_URL when LLM_PROVIDER=ollama in production
         with self.assertRaises(RuntimeError) as ctx:
             asyncio.run(run_lifespan({
                 "ENVIRONMENT": "production",
                 "ADMIN_TOKEN": "strong_secret_token_1234567890",
-                "LLM_PROVIDER": "nebius",
-                "NEBIUS_API_KEY": "",
+                "LLM_PROVIDER": "ollama",
+                "OLLAMA_BASE_URL": "",
             }))
-        self.assertIn("NEBIUS_API_KEY must be set", str(ctx.exception))
+        self.assertIn("OLLAMA_BASE_URL must be configured", str(ctx.exception))
+
+        # 4. Success when ADMIN_TOKEN and external OLLAMA_BASE_URL are provided (no NEBIUS_API_KEY required)
+        try:
+            asyncio.run(run_lifespan({
+                "ENVIRONMENT": "production",
+                "ADMIN_TOKEN": "strong_secret_token_1234567890",
+                "LLM_PROVIDER": "ollama",
+                "OLLAMA_BASE_URL": "https://ollama.external-host.com",
+            }))
+        except Exception as e:
+            self.fail(f"Production startup should succeed with valid ADMIN_TOKEN and OLLAMA_BASE_URL, but failed: {e}")
 
     # 3. Global Security Headers
     def test_global_security_headers_present_on_all_endpoints(self):
@@ -173,15 +199,26 @@ class TestProductionSecurityAndConcurrency(unittest.TestCase):
         """Exceeding the agent query rate limit triggers HTTP 429."""
         headers = {"X-Forwarded-For": "198.51.100.88"}
 
-        # Simulate filling the agent query rate limit (custom limiter with max 3)
-        with patch.object(agent_rate_limiter, "max_requests", 3):
+        from app.agent.schemas import AgentResponse, Verification
+        dummy_resp = AgentResponse(
+            question="What is our leave policy?",
+            answer="Leave policy details.",
+            verification=Verification(passed=True, checks=[]),
+            processing_time_ms=10.0,
+        )
+
+        with patch("app.agent.router.get_orchestrator") as mock_get_orch, \
+             patch.object(agent_rate_limiter, "max_requests", 3):
+            mock_orch = mock_get_orch.return_value
+            mock_orch.run.return_value = dummy_resp
+
             for _ in range(3):
                 resp = self.client.post(
                     "/agent/ask",
                     json={"question": "What is our leave policy?"},
                     headers=headers,
                 )
-                self.assertIn(resp.status_code, (200, 500))  # May fail LLM or succeed, but not 429
+                self.assertEqual(resp.status_code, 200)
 
             # 4th request must be rate-limited
             resp_limited = self.client.post(
@@ -214,6 +251,75 @@ class TestProductionSecurityAndConcurrency(unittest.TestCase):
                 headers={"X-Admin-Token": "wrong_token"},
             )
             self.assertEqual(resp_wrong_token.status_code, 401)
+
+    # 8. Ollama Configuration & Dynamic Model Support
+    def test_ollama_configuration_and_dynamic_model(self):
+        """Verify dynamic configuration for Ollama model, timeout, and Docker hostnames."""
+        reset_ollama_cache()
+        with patch.dict(os.environ, {
+            "OLLAMA_MODEL": "llama3.2:latest",
+            "OLLAMA_BASE_URL": "http://ollama:11434",
+            "OLLAMA_TIMEOUT": "45",
+        }):
+            self.assertEqual(get_ollama_model(), "llama3.2:latest")
+            self.assertEqual(get_ollama_base_url(), "http://ollama:11434")
+            self.assertEqual(get_ollama_timeout(), 45)
+            # Docker hostname is returned directly without localhost probing
+            self.assertEqual(get_base_url(), "http://ollama:11434")
+
+        reset_ollama_cache()
+
+    # 9. Ollama Authentication Headers & Secret Redaction
+    def test_ollama_auth_headers_and_secret_redaction(self):
+        """Verify Authorization headers are constructed and secrets are redacted from error logs."""
+        secret_key = "super_secret_ollama_bearer_token_999"
+        with patch.dict(os.environ, {"OLLAMA_API_KEY": secret_key}):
+            headers = get_ollama_headers()
+            self.assertEqual(headers.get("Authorization"), f"Bearer {secret_key}")
+
+        # Verify secret redaction on connection error
+        with patch.dict(os.environ, {
+            "OLLAMA_BASE_URL": "http://unreachable-external-ollama:11434",
+            "OLLAMA_API_KEY": secret_key,
+        }):
+            reset_ollama_cache()
+            with patch("requests.post", side_effect=requests.exceptions.ConnectionError(f"Failed to connect with token {secret_key}")):
+                with self.assertRaises(OllamaConnectionError) as ctx:
+                    _call_ollama_generate("test prompt")
+                self.assertNotIn(secret_key, str(ctx.exception))
+                self.assertIn("[REDACTED]", str(ctx.exception))
+
+        reset_ollama_cache()
+
+    # 10. Ollama Connection Failure & Health Reporting
+    def test_ollama_connection_failure_handling(self):
+        """Verify clean error handling and degraded health report when Ollama is unreachable."""
+        with patch("requests.get", side_effect=requests.exceptions.ConnectionError("Connection refused")):
+            reset_ollama_cache()
+            status = check_ollama_health()
+            self.assertFalse(status["available"])
+            self.assertIn("Failed to connect to Ollama", status["error"])
+
+        # Health endpoint reports degraded when Ollama is unavailable
+        with patch("app.agent.llm.check_active_llm_health", return_value={"provider": "ollama", "available": False, "model": "qwen2.5:3b", "details": {"available": False}}):
+            resp = self.client.get("/health")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertEqual(data["status"], "degraded")
+            self.assertFalse(data["llm_healthy"])
+
+        reset_ollama_cache()
+
+    # 11. Ollama Model Not Found Handling
+    def test_ollama_model_not_found_handling(self):
+        """Verify OllamaModelNotFoundError is raised when Ollama returns HTTP 404 for model."""
+        mock_resp = type("MockResponse", (), {"status_code": 404, "text": "model not found"})()
+        with patch("requests.post", return_value=mock_resp):
+            reset_ollama_cache()
+            with self.assertRaises(OllamaModelNotFoundError):
+                _call_ollama_generate("test prompt")
+
+        reset_ollama_cache()
 
 
 if __name__ == "__main__":

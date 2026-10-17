@@ -344,7 +344,9 @@ def detect_query_fast_path(
         return None
 
     # Compound queries (joining multiple topics with conjunctions) must fall through to LLM planner
-    if re.search(r"\b(?:and|also|plus|as\s+well\s+as)\b", q_lower):
+    if re.search(r"\b(?:also|plus|as\s+well\s+as)\b", q_lower) or (
+        re.search(r"\b(?:and)\b", q_lower) and "checklist and schedule" not in q_lower
+    ):
         return None
 
     # 1. Company location
@@ -386,7 +388,7 @@ def detect_query_fast_path(
             return QueryPlan(queries=[QueryOperation(intent="leave_policy", query_type="leave_days", entity=leave)])
 
     # 6. List onboarding items / first-week schedule
-    if re.search(r"\b(?:list\s+(?:the\s+)?onboarding\s+items|what\s+are\s+(?:the\s+)?onboarding\s+(?:checklist\s+)?items|show\s+(?:the\s+)?onboarding\s+items|view\s+(?:the\s+)?onboarding\s+items|onboarding\s+checklist\s+items|first\s+week\s+(?:onboarding\s+)?(?:checklist|schedule|items)|onboarding\s+schedule)\b", q_lower):
+    if re.search(r"\b(?:list\s+(?:the\s+)?onboarding\s+items|what\s+are\s+(?:the\s+)?onboarding\s+(?:checklist\s+)?items|show\s+(?:the\s+)?onboarding\s+items|view\s+(?:the\s+)?onboarding\s+items|onboarding\s+checklist\s+items|first\s+week\s+(?:onboarding\s+)?(?:checklist|schedule|items)|onboarding\s+schedule|onboarding\s+checklist(?:\s+and\s+schedule)?)\b", q_lower):
         return QueryPlan(queries=[QueryOperation(intent="onboarding", query_type="onboarding_checklist", entity=None)])
 
     return None

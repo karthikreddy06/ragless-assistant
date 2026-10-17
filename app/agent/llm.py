@@ -13,6 +13,10 @@ from app.llm import (
     OllamaError,
     OllamaModelNotFoundError,
     get_base_url,
+    get_ollama_api_key,
+    get_ollama_headers,
+    get_ollama_model,
+    get_ollama_timeout,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,15 +122,19 @@ class LLMClient(ABC):
 # ==============================================================================
 
 class OllamaClient(LLMClient):
-    """Ollama implementation of LLMClient reusing existing local configuration."""
+    """Ollama implementation of LLMClient reusing existing local configuration or external secure Ollama."""
 
     def __init__(
         self,
         model: Optional[str] = None,
         timeout: Optional[int] = None,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
-        self._model = model or os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
-        self.timeout = timeout or int(os.getenv("LLM_TIMEOUT_SECONDS", str(OLLAMA_TIMEOUT)))
+        self._model = model or get_ollama_model()
+        self.timeout = timeout or get_ollama_timeout()
+        self._base_url = base_url.rstrip("/") if base_url else None
+        self._api_key = api_key if api_key is not None else get_ollama_api_key()
 
     @property
     def provider_name(self) -> str:
@@ -144,8 +152,15 @@ class OllamaClient(LLMClient):
         temperature: float = 0.0,
         max_tokens: Optional[int] = None,
     ) -> str:
-        base_url = get_base_url()
+        base_url = self._base_url or get_base_url()
         url = f"{base_url}/api/generate"
+
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            if self._api_key.lower().startswith("bearer ") or self._api_key.lower().startswith("basic "):
+                headers["Authorization"] = self._api_key
+            else:
+                headers["Authorization"] = f"Bearer {self._api_key}"
 
         options_dict: Dict[str, Any] = {
             "temperature": temperature,
@@ -168,24 +183,37 @@ class OllamaClient(LLMClient):
             payload["format"] = "json"
 
         try:
-            response = requests.post(url, json=payload, timeout=self.timeout)
+            response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
         except requests.exceptions.ConnectionError as e:
+            err_str = str(e)
+            if self._api_key:
+                err_str = redact_secrets(err_str, self._api_key)
             raise OllamaConnectionError(
-                f"Could not connect to Ollama at {base_url}. Ensure Ollama is running."
+                f"Could not connect to Ollama at {base_url}: {err_str}. Ensure Ollama is running."
             ) from e
         except requests.exceptions.Timeout as e:
             raise OllamaConnectionError(
                 f"Ollama request timed out after {self.timeout} seconds."
             ) from e
         except requests.exceptions.RequestException as e:
-            raise OllamaConnectionError(f"Ollama HTTP communication error: {str(e)}") from e
+            err_str = str(e)
+            if self._api_key:
+                err_str = redact_secrets(err_str, self._api_key)
+            raise OllamaConnectionError(f"Ollama HTTP communication error: {err_str}") from e
 
+        if response.status_code in (401, 403):
+            raise OllamaConnectionError(
+                f"Ollama authentication failed (HTTP {response.status_code}) at {base_url}. Check OLLAMA_API_KEY."
+            )
         if response.status_code == 404:
             raise OllamaModelNotFoundError(
                 f"Model '{self._model}' not found in Ollama at {base_url}."
             )
         if response.status_code != 200:
-            raise OllamaError(f"Ollama returned error status {response.status_code}: {response.text}")
+            err_text = response.text
+            if self._api_key:
+                err_text = redact_secrets(err_text, self._api_key)
+            raise OllamaError(f"Ollama returned error status {response.status_code}: {err_text}")
 
         data = response.json()
         raw_output = data.get("response", "").strip()

@@ -19,13 +19,15 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: LLM_PROVIDER
-        value: nebius
-      - key: NEBIUS_API_KEY
+        value: ollama
+      - key: OLLAMA_BASE_URL
         sync: false
-      - key: NEBIUS_BASE_URL
-        value: https://api.tokenfactory.nebius.com/v1/
-      - key: NEBIUS_MODEL
-        value: nvidia/nemotron-3-super-120b-a12b
+      - key: OLLAMA_MODEL
+        value: qwen2.5:3b
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: OLLAMA_TIMEOUT
+        value: "60"
       - key: COOKIE_SECURE
         value: "true"
       - key: ADMIN_TOKEN

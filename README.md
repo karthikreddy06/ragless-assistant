@@ -147,18 +147,38 @@ Copy-Item .env.example .env
 
 **Bash / Generic Shell (Linux/macOS):**
 ```bash
+### 1. Local Development (Native Python)
+```bash
 git clone <REPO_URL>
 cd ragless-assistant
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 2. Run the Application
+Start the application:
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+### 2. Local Development with Docker & Docker Compose
+A multi-container Docker Compose setup is provided with FastAPI and Ollama running together on an isolated internal bridge network:
+
+```bash
+# 1. Build and start both containers
+docker compose up -d
+
+# 2. Pull the configured model into the Ollama container
+docker compose exec ollama ollama pull qwen2.5:3b
+
+# 3. View application logs
+docker compose logs -f app
+```
+
+- **Service Hostname Networking**: The FastAPI app connects to Ollama via `http://ollama:11434` (Docker service hostname, not `localhost`).
+- **Persistence**: Models are cached in the named Docker volume `ollama_data` across restarts.
+- **Web UI**: Open [http://localhost:8000/ui/](http://localhost:8000/ui/) in your browser.
 
 ### 3. Access Interfaces
 - **Web UI**: Open [http://127.0.0.1:8000/ui/](http://127.0.0.1:8000/ui/) in your browser.
@@ -179,17 +199,14 @@ The following table reflects all configuration options defined in [`.env.example
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
 | `ENVIRONMENT` | `development` | Set to `production` in production mode to enforce strict secret checks |
-| `LLM_PROVIDER` | `ollama` | Active LLM provider: `ollama` (default local) or `nebius` (cloud client) |
-| `NEBIUS_API_KEY` | `your_nebius_api_key_here` | API key for OpenAI-compatible cloud client (required when `LLM_PROVIDER=nebius`) |
-| `NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1/` | Base URL for OpenAI-compatible endpoint |
-| `NEBIUS_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Model identifier for cloud completions |
-| `LLM_TIMEOUT_SECONDS`| `30` | Network timeout in seconds for cloud LLM requests |
-| `LLM_MAX_RETRIES` | `3` | Maximum retry attempts for transient cloud HTTP errors |
+| `LLM_PROVIDER` | `ollama` | Active LLM provider (default and exclusive: `ollama`) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama endpoint (`http://localhost:11434` locally, `http://ollama:11434` in Docker Compose, or external HTTPS URL in production) |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | Configurable model identifier (e.g. `qwen2.5:3b`, `llama3.2`, `mistral`) |
+| `OLLAMA_TIMEOUT` | `60` | Network timeout in seconds for Ollama requests |
+| `OLLAMA_API_KEY` | `""` | Optional secret/bearer token for authenticated Ollama reverse proxies or tunnels |
+| `LLM_TIMEOUT_SECONDS`| `60` | Global network timeout in seconds for LLM requests |
 | `LLM_TEMPERATURE` | `0.0` | Sampling temperature for LLM completions |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Endpoint for local Ollama service |
-| `OLLAMA_MODEL` | `qwen2.5:3b` | Local Ollama model name |
-| `OLLAMA_TIMEOUT` | `30` | Timeout in seconds for local Ollama requests |
-| `TAVILY_API_KEY` | `your_tavily_api_key_here` | API key for Tavily web search service |
+| `TAVILY_API_KEY` | `your_tavily_api_key_here` | API key for Tavily web search service (optional) |
 | `TAVILY_TIMEOUT_SECONDS`| `10` | Timeout in seconds for external web search |
 | `WEB_MAX_CALLS_PER_REQUEST`| `2` | Maximum outbound web queries allowed per single user turn |
 | `ADMIN_TOKEN` | `your_admin_token_here` | Header secret for `X-Admin-Token` on `/knowledge/import` (mandatory in production, min 16 chars) |
@@ -208,52 +225,53 @@ The following table reflects all configuration options defined in [`.env.example
 
 ---
 
-## Production Deployment (Render Free Tier)
+## Production Deployment (Render Free Tier + External Ollama)
 
-RAGless is configured for straightforward zero-cost deployment on the **Render Free Tier** using cloud LLM inference (`LLM_PROVIDER=nebius`) and automated SQLite startup seeding.
+RAGless is configured for zero-cost deployment on the **Render Free Tier** (`plan: free`, 512 MB RAM).
 
 ### Free-Tier Architecture & Characteristics
-- **Free Web Service (512 MB RAM)**: Local Ollama cannot run inside a 512 MB memory footprint without GPU. The production deployment routes to Nebius Token Factory or any OpenAI-compatible provider over HTTPS.
+- **Free Web Service (512 MB RAM)**: Render's free tier provides 512 MB memory, which is ideal for the lightweight FastAPI + SQLite backend. However, running a quantized LLM like `qwen2.5:3b` in Ollama requires 2–4 GB RAM and GPU acceleration. Therefore, the production architecture connects Render to a **separately hosted Ollama instance**.
 - **Cold-Start Behavior**: Render free instances automatically spin down after 15 minutes of inactivity. When a new visitor accesses the application, the instance wakes up with a cold start delay of ~30–50 seconds.
-- **Database Persistence**: Free instances feature an ephemeral filesystem. On container startup, `seed_database()` automatically and idempotently populates SQLite from `data/sample_knowledge.json`. While custom registered user accounts and task changes are reset upon container spin-down, the full company knowledge base, leave policies, and onboarding checklists are 100% available for public evaluation.
-- **In-Memory Rate Limiting**: Request and login rate limits operate in-process. Counters reset upon container restart or sleep.
+- **Database Persistence**: Free instances feature an ephemeral filesystem. On container startup, `seed_database()` automatically populates SQLite from `data/sample_knowledge.json`. Full company knowledge base, leave policies, and onboarding checklists are 100% available on every wakeup.
+
+### Secure External Ollama Networking (CRITICAL)
+> [!CAUTION]
+> **Never expose Ollama's unauthenticated API (`0.0.0.0:11434`) directly to the public internet.** Doing so allows anyone to consume your GPU/CPU, pull large models, or flood your machine.
+
+To securely connect Render to Ollama running on your local computer or VPS:
+
+1. **Option A — Cloudflare Tunnel (Recommended & Free)**:
+   - Install `cloudflared` on your machine where Ollama is running.
+   - Run `cloudflared tunnel --url http://localhost:11434`.
+   - Protect your tunnel endpoint with Cloudflare Access or a secret HTTP header/token.
+   - In Render, configure `OLLAMA_BASE_URL=https://your-tunnel.trycloudflare.com` and `OLLAMA_API_KEY=<token>`.
+
+2. **Option B — Reverse Proxy (Caddy / Nginx) with Bearer Token**:
+   - Place Caddy or Nginx in front of Ollama with HTTPS (Let's Encrypt).
+   - Enforce Bearer token authentication in Nginx/Caddy configuration.
+   - Configure `OLLAMA_BASE_URL=https://ollama.yourdomain.com` and `OLLAMA_API_KEY=<secret>` in Render.
+
+### What Must Run For the Public AI Demo to Work
+For the public Render demo to complete end-to-end AI reasoning:
+1. Your external Ollama server (or local machine with Cloudflare Tunnel) must be running with model `qwen2.5:3b` pulled.
+2. The tunnel or reverse proxy URL must be set in Render's `OLLAMA_BASE_URL` environment variable.
+3. *Note*: Even if Ollama is temporarily offline, the deterministic fast-path and template answers (e.g. employee headcounts, location, leave days) will continue to return instant grounded answers from SQLite without error.
 
 ### Deploying via Render Blueprint (`render.yaml`)
 
 1. Fork or push this repository to GitHub.
 2. In your [Render Dashboard](https://dashboard.render.com), click **New** > **Blueprint**.
-3. Select this repository. Render will automatically parse [`render.yaml`](render.yaml):
+3. Select this repository. Render automatically reads [`render.yaml`](render.yaml):
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers`
    - **Health Check Path**: `/health`
-4. In the Blueprint parameters, enter your **`NEBIUS_API_KEY`** (Render automatically generates a secure 32-character `ADMIN_TOKEN`).
-5. Click **Apply**. Once deployed, navigate to `https://<your-service-name>.onrender.com/ui/`.
-
-### Manual Deployment on Render (Without Blueprint)
-
-If creating the web service manually:
-1. Click **New** > **Web Service** > Connect your repository.
-2. Configure settings:
-   - **Runtime**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers`
    - **Plan**: `Free`
-   - **Health Check Path**: `/health`
-3. Add Environment Variables:
-   - `PYTHON_VERSION`: `3.11.9`
-   - `ENVIRONMENT`: `production`
-   - `LLM_PROVIDER`: `nebius`
-   - `NEBIUS_API_KEY`: `<your_cloud_api_key>`
-   - `COOKIE_SECURE`: `true`
-   - `ADMIN_TOKEN`: `<random_secret_at_least_16_characters>`
-   - `FAST_PATH_ENABLED`: `true`
-   - `DETERMINISTIC_ANSWERS_ENABLED`: `true`
-   - `TRUST_PROXY_HEADERS`: `true`
-4. Click **Create Web Service**.
+4. In the Blueprint parameters, enter your **`OLLAMA_BASE_URL`** (and optional `OLLAMA_API_KEY`). Render automatically generates a 32-character `ADMIN_TOKEN`.
+5. Click **Apply**.
 
 ### How to Run Tests Locally
 ```bash
-# Run all fast unit and integration tests (227 tests)
+# Run all fast unit and integration tests
 pytest -m "not slow"
 
 # Run tests with production security validations
